@@ -31,10 +31,10 @@
 
 (frp/defe source-append-move
           source-buffer
-          source-content
           source-dimension-register
           source-directory
           source-edge-register
+          source-undo-redo
           source-in
           source-line-segment
           source-dollar-move
@@ -42,6 +42,8 @@
           source-scroll-x
           source-scroll-y
           source-transform-edge-action
+          source-undo-redo-x
+          source-undo-redo-y
           append
           blockwise-visual-toggle
           down
@@ -196,17 +198,11 @@
 (def get-cursor-behavior
   (partial frp/stepper initial-cursor))
 
-(def get-undo-redo-cursor
-  #(m/<$> last (frp/snapshot (m/<> undo redo)
-                             (->> source-content
-                                  (m/<$> %)
-                                  (frp/stepper initial-cursor)))))
-
 (def cursor-x-event
   (->> source-buffer
        (m/<$> :x)
        (m/<> (aid/<$ initial-cursor carrot)
-             (get-undo-redo-cursor :x)
+             source-undo-redo-x
              source-dollar-move
              source-append-move)
        (get-cursor-event right left)))
@@ -214,7 +210,7 @@
 (def cursor-y-event
   (->> source-buffer
        (m/<$> :y)
-       (m/<> (get-undo-redo-cursor :y))
+       (m/<> source-undo-redo-y)
        (get-cursor-event down up)))
 
 (def cursor-x-behavior
@@ -616,11 +612,26 @@
              reset)
        (frp/accum initial-history)))
 
-(def sink-content
+(def content
   (m/<$> ffirst history))
 
+(def get-undo-redo-cursor
+  #(m/<$> last (frp/snapshot source-undo-redo
+                             (->> content
+                                  (m/<$> %)
+                                  (frp/stepper initial-cursor)))))
+
+(def sink-undo-redo-x
+  (get-undo-redo-cursor :x))
+
+(def sink-undo-redo-y
+  (get-undo-redo-cursor :y))
+
+(def sink-undo-redo
+  (m/<> undo redo))
+
 (def edge-event
-  (m/<$> :edge sink-content))
+  (m/<$> :edge content))
 
 (def edge-behavior
   (frp/stepper initial-edge edge-event))
@@ -630,7 +641,7 @@
        (m/<$> (partial apply get-set-node-action**))
        (m/<> (m/<$> (comp constantly
                           :node)
-                    sink-content))
+                    content))
        (frp/accum initial-node)))
 
 (def node-behavior
@@ -1547,17 +1558,19 @@
 
 (loop-event {source-append-move           sink-append-move
              source-buffer                sink-buffer
-             source-content               sink-content
              source-directory             sink-directory
              source-dimension-register    sink-dimension-register
              source-edge-register         sink-edge-register
+             source-undo-redo             sink-undo-redo
              source-in                    sink-in
              source-line-segment          sink-line-segment
              source-dollar-move           sink-dollar-move
              source-node-register         sink-node-register
              source-scroll-x              sink-scroll-x
              source-scroll-y              sink-scroll-y
-             source-transform-edge-action sink-transform-edge-action})
+             source-transform-edge-action sink-transform-edge-action
+             source-undo-redo-x           sink-undo-redo-x
+             source-undo-redo-y           sink-undo-redo-y})
 
 (frp/run #(oset! js/document "title" %) current-file-path)
 
