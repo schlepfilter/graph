@@ -1,10 +1,10 @@
 (defproject graph "0.1.0-SNAPSHOT"
-  :dependencies [[org.clojure/clojure "1.10.0"]
+  :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/clojurescript "1.10.439"]
                  [org.clojure/data.avl "0.1.0"]
-                 [org.clojure/math.combinatorics "0.1.4"]
+                 [org.clojure/math.combinatorics "0.1.6"]
                  [cljs-node-io "1.1.2"]
-                 [cljsjs/mousetrap "1.5.3-0"]
+                 [cljsjs/mousetrap "1.6.2-0"]
                  [frp "0.1.3"]
                  [me.raynes/fs "1.4.6"]
                  [reagent "0.8.1" :exclusions [cljsjs/react]]
@@ -13,7 +13,7 @@
             [lein-cljsbuild "1.1.7"]]
   :source-paths ["src/helpers"]
   :profiles {:dev      {:dependencies [[binaryage/devtools "0.9.10"]
-                                       [figwheel-sidecar "0.5.18"]]}
+                                       [figwheel-sidecar "0.5.19"]]}
              ;:renderer profile works around the following error in REPL.
              ;----  Could not Analyze  src/renderer/graph/core.cljs  ----
              ;
