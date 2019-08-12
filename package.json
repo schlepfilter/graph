@@ -17,9 +17,9 @@
   "dependencies": {
     "electron-window-state": "5.0.3",
     "katex": "0.10.0",
-    "react": "16.7.0",
-    "react-ace": "6.3.2",
-    "react-dom": "16.7.0",
+    "react": "16.9.0",
+    "react-ace": "7.0.2",
+    "react-dom": "16.9.0",
     "react-measure": "2.3.0"
   }
 }
