@@ -1202,7 +1202,31 @@
    "z" "zeta"
    "h" "eta"
    "j" "theta"
-   "l" "lambda"})
+   "k" "kappa"
+   "l" "lambda"
+   "m" "mu"
+   "n" "nu"
+   "x" "xi"
+   "p" "pi"
+   "r" "rho"
+   "s" "sigma"
+   "t" "tau"
+   "u" "upsilon"
+   "f" "phi"
+   "q" "chi"
+   "y" "psi"
+   "w" "omega"
+   "D" "Delta"
+   "G" "Gamma"
+   "J" "Theta"
+   "L" "Lambda"
+   "X" "Xi"
+   "P" "Pi"
+   "S" "Sigma"
+   "U" "Upsilon"
+   "F" "Phi"
+   "Y" "Psi"
+   "W" "Omega"})
 
 (defc editor
       [& _]
