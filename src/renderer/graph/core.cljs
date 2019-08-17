@@ -1,5 +1,6 @@
 (ns graph.core
-  (:require [cljs.tools.reader.edn :as edn]
+  (:require [cljs.pprint :as pprint]
+            [cljs.tools.reader.edn :as edn]
             [clojure.set :as set]
             [clojure.string :as str]
             ace
@@ -1203,42 +1204,53 @@
                         keyboard))
    :name    keyboard})
 
+(def alphabets
+  (mapcat (fn [[start* end]]
+            (->> end
+                 pprint/char-code
+                 inc
+                 (range (pprint/char-code start*))
+                 (map char)))
+          [[\A \Z]
+           [\a \z]]))
+
 (def math-keymap
-  {"a" "alpha"
-   "b" "beta"
-   "g" "gamma"
-   "d" "delta"
-   "e" "epsilon"
-   "z" "zeta"
-   "h" "eta"
-   "j" "theta"
-   "k" "kappa"
-   "l" "lambda"
-   "m" "mu"
-   "n" "nu"
-   "x" "xi"
-   "p" "pi"
-   "r" "rho"
-   "s" "sigma"
-   "t" "tau"
-   "u" "upsilon"
-   "f" "phi"
-   "q" "chi"
-   "y" "psi"
-   "w" "omega"
-   "v" ""
-   "D" "Delta"
-   "G" "Gamma"
-   "J" "Theta"
-   "L" "Lambda"
-   "X" "Xi"
-   "P" "Pi"
-   "S" "Sigma"
-   "U" "Upsilon"
-   "F" "Phi"
-   "Y" "Psi"
-   "W" "Omega"
-   "A" ""})
+  (merge (->> ""
+              repeat
+              (zipmap alphabets))
+         {"a" "alpha"
+          "b" "beta"
+          "g" "gamma"
+          "d" "delta"
+          "e" "epsilon"
+          "z" "zeta"
+          "h" "eta"
+          "j" "theta"
+          "k" "kappa"
+          "l" "lambda"
+          "m" "mu"
+          "n" "nu"
+          "x" "xi"
+          "p" "pi"
+          "r" "rho"
+          "s" "sigma"
+          "t" "tau"
+          "u" "upsilon"
+          "f" "phi"
+          "q" "chi"
+          "y" "psi"
+          "w" "omega"
+          "D" "Delta"
+          "G" "Gamma"
+          "J" "Theta"
+          "L" "Lambda"
+          "X" "Xi"
+          "P" "Pi"
+          "S" "Sigma"
+          "U" "Upsilon"
+          "F" "Phi"
+          "Y" "Psi"
+          "W" "Omega"}))
 
 (defc editor
       [& _]
