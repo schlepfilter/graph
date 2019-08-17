@@ -1214,43 +1214,38 @@
           [[\A \Z]
            [\a \z]]))
 
+(def upper-keymap
+  {"D" "Delta"
+   "G" "Gamma"
+   "J" "Theta"
+   "L" "Lambda"
+   "X" "Xi"
+   "P" "Pi"
+   "S" "Sigma"
+   "U" "Upsilon"
+   "F" "Phi"
+   "Y" "Psi"
+   "W" "Omega"})
+
 (def math-keymap
   (merge (->> ""
               repeat
               (zipmap alphabets))
+         upper-keymap
+         (s/transform (s/multi-path s/MAP-KEYS s/MAP-VALS)
+                      str/lower-case
+                      upper-keymap)
          {"a" "alpha"
           "b" "beta"
-          "g" "gamma"
-          "d" "delta"
           "e" "epsilon"
           "z" "zeta"
           "h" "eta"
-          "j" "theta"
           "k" "kappa"
-          "l" "lambda"
           "m" "mu"
           "n" "nu"
-          "x" "xi"
-          "p" "pi"
           "r" "rho"
-          "s" "sigma"
           "t" "tau"
-          "u" "upsilon"
-          "f" "phi"
-          "q" "chi"
-          "y" "psi"
-          "w" "omega"
-          "D" "Delta"
-          "G" "Gamma"
-          "J" "Theta"
-          "L" "Lambda"
-          "X" "Xi"
-          "P" "Pi"
-          "S" "Sigma"
-          "U" "Upsilon"
-          "F" "Phi"
-          "Y" "Psi"
-          "W" "Omega"}))
+          "q" "chi"}))
 
 (defc editor
       [& _]
