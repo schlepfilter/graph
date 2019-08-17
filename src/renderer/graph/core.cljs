@@ -1184,53 +1184,65 @@
 (def get-status-text
   #(.keyBinding.getStatusText (:editor %) (:editor %)))
 
+(def upper?
+  (aid/build =
+             identity
+             str/upper-case))
+
 (aid/defcurried get-command
   [state [keyboard s]]
-  {:bindKey keyboard
+  {:bindKey (aid/if-then upper?
+                         (partial str "shift+")
+                         keyboard)
    :exec    #(.insert (:editor @state)
-                      (aid/casep @state
-                        :backtick (str "\\" s)
+                      (case (:math @state)
+                        :backtick (aid/if-else empty?
+                                               (partial str "\\")
+                                               s)
+                        :c (str "\\mathcal{" keyboard "}")
                         keyboard))
    :name    keyboard})
 
 (def math-keymap
-  {"a"       "alpha"
-   "b"       "beta"
-   "g"       "gamma"
-   "d"       "delta"
-   "e"       "epsilon"
-   "z"       "zeta"
-   "h"       "eta"
-   "j"       "theta"
-   "k"       "kappa"
-   "l"       "lambda"
-   "m"       "mu"
-   "n"       "nu"
-   "x"       "xi"
-   "p"       "pi"
-   "r"       "rho"
-   "s"       "sigma"
-   "t"       "tau"
-   "u"       "upsilon"
-   "f"       "phi"
-   "q"       "chi"
-   "y"       "psi"
-   "w"       "omega"
-   "shift+d" "Delta"
-   "shift+g" "Gamma"
-   "shift+j" "Theta"
-   "shift+l" "Lambda"
-   "shift+x" "Xi"
-   "shift+p" "Pi"
-   "shift+s" "Sigma"
-   "shift+u" "Upsilon"
-   "shift+f" "Phi"
-   "shift+y" "Psi"
-   "shift+w" "Omega"})
+  {"a" "alpha"
+   "b" "beta"
+   "g" "gamma"
+   "d" "delta"
+   "e" "epsilon"
+   "z" "zeta"
+   "h" "eta"
+   "j" "theta"
+   "k" "kappa"
+   "l" "lambda"
+   "m" "mu"
+   "n" "nu"
+   "x" "xi"
+   "p" "pi"
+   "r" "rho"
+   "s" "sigma"
+   "t" "tau"
+   "u" "upsilon"
+   "f" "phi"
+   "q" "chi"
+   "y" "psi"
+   "w" "omega"
+   "v" ""
+   "D" "Delta"
+   "G" "Gamma"
+   "J" "Theta"
+   "L" "Lambda"
+   "X" "Xi"
+   "P" "Pi"
+   "S" "Sigma"
+   "U" "Upsilon"
+   "F" "Phi"
+   "Y" "Psi"
+   "W" "Omega"
+   "A" ""})
 
 (defc editor
       [& _]
-      (let [state (atom {})]
+      (let [state (atom {:math :other})]
         (r/create-class
           {:component-did-mount
            (fn [_]
@@ -1249,11 +1261,14 @@
                                           get-status-text
                                           editor-keyup)
                                       (swap! state
-                                             (partial s/setval*
-                                                      :backtick
-                                                      (-> event*
-                                                          .-key
-                                                          (= "`"))))))))
+                                             (partial s/transform*
+                                                      :math
+                                                      #(case (.-key event*)
+                                                         "`" :backtick
+                                                         "c" (case %
+                                                               :backtick :c
+                                                               :other)
+                                                         :other)))))))
            :component-did-update
            (fn [_]
              (if (-> @state
@@ -1268,9 +1283,16 @@
              [:> ace-editor
               {:commands         (->> math-keymap
                                       (map (get-command state))
-                                      (s/setval s/BEFORE-ELEM
-                                                {:bindKey "`"
-                                                 :exec    aid/nop}))
+                                      (concat [{:bindKey "`"
+                                                :exec    aid/nop
+                                                :name    "backtick"}
+                                               {:bindKey "c"
+                                                :exec    #(.insert (:editor @state)
+                                                                   (case (:math @state)
+                                                                     :backtick ""
+                                                                     :c "\\mathcal{c}"
+                                                                     "c"))
+                                                :name    "c"}]))
                :focus            (= :insert mode)
                :keyboard-handler "vim"
                :mode             "latex"
