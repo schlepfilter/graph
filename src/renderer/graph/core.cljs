@@ -1189,15 +1189,20 @@
   {:bindKey keyboard
    :exec    #(.insert (:editor @state)
                       (aid/casep @state
-                        :backtick s
+                        :backtick (str "\\" s)
                         keyboard))
    :name    keyboard})
 
 (def math-keymap
-  {"a" "\\alpha"
-   "b" "\\beta"
-   "g" "\\gamma"
-   "l" "\\lambda"})
+  {"a" "alpha"
+   "b" "beta"
+   "g" "gamma"
+   "d" "delta"
+   "e" "epsilon"
+   "z" "zeta"
+   "h" "eta"
+   "j" "theta"
+   "l" "lambda"})
 
 (defc editor
       [& _]
