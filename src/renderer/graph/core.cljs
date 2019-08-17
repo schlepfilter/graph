@@ -1190,6 +1190,9 @@
              identity
              str/upper-case))
 
+(def get-mathcal
+  (partial (aid/flip str/join) ["\\mathcal{" "}"]))
+
 (aid/defcurried get-command
   [state [keyboard s]]
   {:bindKey (aid/if-then upper?
@@ -1203,7 +1206,7 @@
                         (if (str/starts-with? keyboard "ctrl")
                           ""
                           (case (:math @state)
-                            :c (str "\\mathcal{" keyboard "}")
+                            :c (get-mathcal keyboard)
                             keyboard))))
    :name    keyboard})
 
@@ -1334,16 +1337,18 @@
              [:> ace-editor
               {:commands         (->> math-keymap
                                       (map (get-command state))
-                                      (concat [{:bindKey "`"
-                                                :exec    aid/nop
-                                                :name    "backtick"}
-                                               {:bindKey "c"
-                                                :exec    #(.insert (:editor @state)
-                                                                   (case (:math @state)
-                                                                     :backtick ""
-                                                                     :c "\\mathcal{c}"
-                                                                     "c"))
-                                                :name    "c"}]))
+                                      (concat
+                                        [{:bindKey "`"
+                                          :exec    aid/nop
+                                          :name    "backtick"}
+                                         {:bindKey "c"
+                                          :exec    #(.insert
+                                                      (:editor @state)
+                                                      (case (:math @state)
+                                                        :backtick ""
+                                                        :c (get-mathcal "c")
+                                                        "c"))
+                                          :name    "c"}]))
                :focus            (= :insert mode)
                :keyboard-handler "vim"
                :mode             "latex"
