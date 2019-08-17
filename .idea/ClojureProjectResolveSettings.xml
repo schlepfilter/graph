@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ClojureProjectResolveSettings">
+    <item key="aid.core/case-eval" resolves-as="clojure.core/case" />
+    <item key="cljs.core/defonce" resolves-as="clojure.core/def" />
+    <item key="clojure.test.check.generators/let" resolves-as="clojure.core/let" />
+    <item key="aid.core/casep" resolves-as="clojure.core/case" />
+    <item key="clojure.test.check.properties/for-all" resolves-as="clojure.core/let" />
+    <item key="aid.core/defcurried" resolves-as="clojure.core/def" />
+    <item key="frp.browser/defevent" resolves-as="clojure.core/def" />
+    <item key="frp.browser/defbehavior" resolves-as="clojure.core/def" />
+    <item key="frp.core/defe" resolves-as="clojure.core/declare" />
+    <item key="com.rpl.specter/defdynamicnav" resolves-as="clojure.core/defn" />
+    <item key="com.rpl.specter/defnav" resolves-as="clojure.core/def" />
+    <item key="clojure.test.check.clojure-test/defspec" resolves-as="cljs.test/deftest" />
+    <currentScheme>PROJECT</currentScheme>
+  </component>
+</project>
