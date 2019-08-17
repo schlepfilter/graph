@@ -1190,10 +1190,14 @@
    :exec    #(.insert (:editor @state)
                       (aid/casep @state
                         :backtick s
-                        keyboard))})
+                        keyboard))
+   :name    keyboard})
 
 (def math-keymap
-  {"l" "\\lambda"})
+  {"a" "\\alpha"
+   "b" "\\beta"
+   "g" "\\gamma"
+   "l" "\\lambda"})
 
 (defc editor
       [& _]
@@ -1236,8 +1240,7 @@
               {:commands         (->> math-keymap
                                       (map (get-command state))
                                       (s/setval s/BEFORE-ELEM
-                                                {:name    "`"
-                                                 :bindKey "`"
+                                                {:bindKey "`"
                                                  :exec    aid/nop}))
                :focus            (= :insert mode)
                :keyboard-handler "vim"
