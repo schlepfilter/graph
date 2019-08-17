@@ -1184,6 +1184,17 @@
 (def get-status-text
   #(.keyBinding.getStatusText (:editor %) (:editor %)))
 
+(aid/defcurried get-command
+  [state [keyboard s]]
+  {:bindKey keyboard
+   :exec    #(.insert (:editor @state)
+                      (aid/casep @state
+                        :backtick s
+                        keyboard))})
+
+(def math-keymap
+  {"l" "\\lambda"})
+
 (defc editor
       [& _]
       (let [state (atom {})]
@@ -1222,14 +1233,12 @@
            (fn [mode text]
              (swap! state (partial s/setval* :mode mode))
              [:> ace-editor
-              {:commands         [{:name    "`"
-                                   :bindKey "`"
-                                   :exec    aid/nop}
-                                  {:bindKey "l"
-                                   :exec    #(.insert (:editor @state)
-                                                      (aid/casep @state
-                                                        :backtick "\\lambda"
-                                                        "l"))}]
+              {:commands         (->> math-keymap
+                                      (map (get-command state))
+                                      (s/setval s/BEFORE-ELEM
+                                                {:name    "`"
+                                                 :bindKey "`"
+                                                 :exec    aid/nop}))
                :focus            (= :insert mode)
                :keyboard-handler "vim"
                :mode             "latex"
@@ -1586,7 +1595,7 @@
 (def bind-keymap
   (partial run! (partial apply bind)))
 
-(def keymap
+(def graph-keymap
   {"$"      dollar
    ":"      command
    "\\"     implication
@@ -1606,7 +1615,7 @@
    "x"      delete
    "y"      yank})
 
-(bind-keymap keymap)
+(bind-keymap graph-keymap)
 
 (.config.loadModule ace
                     "ace/keyboard/vim"
