@@ -1200,8 +1200,11 @@
                         :backtick (aid/if-else empty?
                                                (partial str "\\")
                                                s)
-                        :c (str "\\mathcal{" keyboard "}")
-                        keyboard))
+                        (if (str/starts-with? keyboard "ctrl")
+                          ""
+                          (case (:math @state)
+                            :c (str "\\mathcal{" keyboard "}")
+                            keyboard))))
    :name    keyboard})
 
 (def alphabets
@@ -1213,6 +1216,11 @@
                  (map char)))
           [[\A \Z]
            [\a \z]]))
+
+(def default-keymap
+  (->> ""
+       repeat
+       (zipmap alphabets)))
 
 (def upper-keymap
   {"D" "Delta"
@@ -1228,27 +1236,60 @@
    "W" "Omega"})
 
 (def lower-keymap
-  {"a" "alpha"
-   "b" "beta"
-   "e" "epsilon"
-   "z" "zeta"
-   "h" "eta"
-   "k" "kappa"
-   "m" "mu"
-   "n" "nu"
-   "r" "rho"
-   "t" "tau"
-   "q" "chi"})
-
-(def math-keymap
-  (merge (->> ""
-              repeat
-              (zipmap alphabets))
-         (s/transform (s/multi-path s/MAP-KEYS s/MAP-VALS)
+  (merge (s/transform (s/multi-path s/MAP-KEYS s/MAP-VALS)
                       str/lower-case
                       upper-keymap)
-         lower-keymap
-         upper-keymap))
+         {"a" "alpha"
+          "b" "beta"
+          "e" "epsilon"
+          "z" "zeta"
+          "h" "eta"
+          "k" "kappa"
+          "m" "mu"
+          "n" "nu"
+          "r" "rho"
+          "t" "tau"
+          "q" "chi"}))
+
+(def symbol-keymap
+  {"<"  "le"
+   ">"  "ge"
+   "~"  "tilde"
+   "^"  "hat"
+   "N"  "nabla"
+   "I"  "infty"
+   "A"  "forall"
+   "E"  "exists"
+   "/"  "not"
+   "i"  "in"
+   "*"  "times"
+   "."  "cdot"
+   ":"  "colon"
+   "{"  "sub"
+   "}"  "supset"
+   "["  "sube"
+   "]"  "supe"
+   "0"  "empty"
+   "\\" "setminus"
+   "+"  "cup"
+   "-"  "cap"
+   "("  "langle"
+   ")"  "rangle"
+   "|"  "vee"
+   "&"  "wedge"})
+
+(def ctrl-keymap
+  (s/transform s/MAP-KEYS (partial str "ctrl+") {"e" "exp"
+                                                 "s" "sin"
+                                                 "c" "cos"
+                                                 "^" "sup"
+                                                 "_" "inf"
+                                                 "d" "det"
+                                                 "l" "lim"
+                                                 "t" "tan"}))
+
+(def math-keymap
+  (merge default-keymap lower-keymap upper-keymap symbol-keymap ctrl-keymap))
 
 (defc editor
       [& _]
