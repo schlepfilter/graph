@@ -1227,25 +1227,28 @@
    "Y" "Psi"
    "W" "Omega"})
 
+(def lower-keymap
+  {"a" "alpha"
+   "b" "beta"
+   "e" "epsilon"
+   "z" "zeta"
+   "h" "eta"
+   "k" "kappa"
+   "m" "mu"
+   "n" "nu"
+   "r" "rho"
+   "t" "tau"
+   "q" "chi"})
+
 (def math-keymap
   (merge (->> ""
               repeat
               (zipmap alphabets))
-         upper-keymap
          (s/transform (s/multi-path s/MAP-KEYS s/MAP-VALS)
                       str/lower-case
                       upper-keymap)
-         {"a" "alpha"
-          "b" "beta"
-          "e" "epsilon"
-          "z" "zeta"
-          "h" "eta"
-          "k" "kappa"
-          "m" "mu"
-          "n" "nu"
-          "r" "rho"
-          "t" "tau"
-          "q" "chi"}))
+         lower-keymap
+         upper-keymap))
 
 (defc editor
       [& _]
