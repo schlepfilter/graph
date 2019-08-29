@@ -35,14 +35,15 @@
           source-dimension-register
           source-directory
           source-edge-register
-          source-undo-redo
           source-in
           source-line-segment
           source-dollar-move
+          source-nearest-move
           source-node-register
           source-scroll-x
           source-scroll-y
           source-transform-edge-action
+          source-undo-redo
           source-undo-redo-x
           source-undo-redo-y
           append
@@ -54,6 +55,7 @@
           carrot
           dollar
           word
+          back
           delete
           ;TODO: when mousetrap starts to support all keys capture, replace "y" with all keys capture
           ;https://github.com/ccampbell/mousetrap/issues/134
@@ -206,13 +208,14 @@
        (m/<> (aid/<$ initial-cursor carrot)
              source-undo-redo-x
              source-dollar-move
+             (m/<$> first source-nearest-move)
              source-append-move)
        (get-cursor-event right left)))
 
 (def cursor-y-event
   (->> source-buffer
        (m/<$> :y)
-       (m/<> source-undo-redo-y)
+       (m/<> source-undo-redo-y (m/<$> last source-nearest-move))
        (get-cursor-event down up)))
 
 (def cursor-x-behavior
@@ -804,13 +807,19 @@
                 (constantly default)
                 (avl/nearest coll test x))))
 
+(def get-nearest-key
+  (comp first
+        (partial apply nearest)
+        (partial s/transform* s/LAST vector)
+        vector))
+
 (aid/defcurried get-end
   [f y id*]
   (aid/if-then-else (comp (partial = y)
                           last)
                     f
                     (constantly 0)
-                    (first (nearest id* < [0 (inc y)] [[0 y]]))))
+                    (get-nearest-key id* < [0 (inc y)] [0 y])))
 
 (def sink-dollar-move
   (m/<$> (comp (partial apply (get-end first))
@@ -833,6 +842,15 @@
                        cursor-y-behavior
                        node-behavior
                        valid-bound-behavior)))
+
+(def sink-nearest-move
+  (m/<$> (fn [[f x y node]]
+           (get-nearest-key (:id node) f [x y] [x y]))
+         (frp/snapshot (m/<> (aid/<$ > word)
+                             (aid/<$ < back))
+                       cursor-x-behavior
+                       cursor-y-behavior
+                       node-behavior)))
 
 (def make-directional
   #(comp (partial apply =)
@@ -1687,6 +1705,7 @@
              source-in                    sink-in
              source-line-segment          sink-line-segment
              source-dollar-move           sink-dollar-move
+             source-nearest-move          sink-nearest-move
              source-node-register         sink-node-register
              source-scroll-x              sink-scroll-x
              source-scroll-y              sink-scroll-y
@@ -1717,6 +1736,7 @@
    "ctrl+v" blockwise-visual-toggle
    "escape" escape
    "A"      append
+   "b"      back
    "h"      left
    "i"      insert-insert
    "j"      down
