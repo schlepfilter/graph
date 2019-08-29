@@ -1278,7 +1278,8 @@
    "-"  "cap"
    "("  "langle"
    ")"  "rangle"
-   "|"  "vee"
+   ;TODO uncomment the following line when Ace starts to support `|`
+   ;"|"  "vee"
    "&"  "wedge"})
 
 (def ctrl-keymap
