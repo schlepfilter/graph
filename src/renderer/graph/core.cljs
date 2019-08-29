@@ -53,6 +53,7 @@
           right
           carrot
           dollar
+          word
           delete
           ;TODO: when mousetrap starts to support all keys capture, replace "y" with all keys capture
           ;https://github.com/ccampbell/mousetrap/issues/134
@@ -1724,6 +1725,7 @@
    "p"      paste
    "space"  insert-normal
    "u"      undo
+   "w"      word
    "x"      delete
    "y"      yank})
 
