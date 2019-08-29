@@ -1,5 +1,6 @@
 (ns graph.core
-  (:require [cljs.tools.reader.edn :as edn]
+  (:require [cljs.pprint :as pprint]
+            [cljs.tools.reader.edn :as edn]
             [clojure.set :as set]
             [clojure.string :as str]
             ace
@@ -237,7 +238,7 @@
   (loom/digraph))
 
 (def exit?
-  #{"Control" "Escape"})
+  (partial = "Escape"))
 
 (def command-exit
   (->> command-keydown
@@ -820,8 +821,8 @@
            (->> node
                 :id
                 (get-end (aid/build +
-                                    (comp js/Math.ceil
-                                          (partial (aid/flip /) cursor-size)
+                                    (comp inc
+                                          (partial (aid/flip quot) cursor-size)
                                           :width
                                           bound
                                           (:id node))
@@ -1184,9 +1185,120 @@
 (def get-status-text
   #(.keyBinding.getStatusText (:editor %) (:editor %)))
 
+(def upper?
+  (aid/build =
+             identity
+             str/upper-case))
+
+(def get-mathcal
+  (partial (aid/flip str/join) ["\\mathcal{" "}"]))
+
+(aid/defcurried get-command
+  [state [keyboard s]]
+  {:bindKey (aid/if-then upper?
+                         (partial str "shift+")
+                         keyboard)
+   :exec    #(.insert (:editor @state)
+                      (case (:math @state)
+                        :backtick (aid/if-else empty?
+                                               (partial str "\\")
+                                               s)
+                        (if (str/starts-with? keyboard "ctrl")
+                          ""
+                          (case (:math @state)
+                            :c (get-mathcal keyboard)
+                            keyboard))))
+   :name    keyboard})
+
+(def alphabets
+  (mapcat (fn [[start* end]]
+            (->> end
+                 pprint/char-code
+                 inc
+                 (range (pprint/char-code start*))
+                 (map char)))
+          [[\A \Z]
+           [\a \z]]))
+
+(def default-keymap
+  (->> ""
+       repeat
+       (zipmap alphabets)))
+
+(def upper-keymap
+  {"D" "Delta"
+   "G" "Gamma"
+   "J" "Theta"
+   "L" "Lambda"
+   "X" "Xi"
+   "P" "Pi"
+   "S" "Sigma"
+   "U" "Upsilon"
+   "F" "Phi"
+   "Y" "Psi"
+   "W" "Omega"})
+
+(def lower-keymap
+  (merge (s/transform (s/multi-path s/MAP-KEYS s/MAP-VALS)
+                      str/lower-case
+                      upper-keymap)
+         {"a" "alpha"
+          "b" "beta"
+          "e" "epsilon"
+          "z" "zeta"
+          "h" "eta"
+          "k" "kappa"
+          "m" "mu"
+          "n" "nu"
+          "r" "rho"
+          "t" "tau"
+          "q" "chi"}))
+
+(def symbol-keymap
+  {"<"  "le"
+   ">"  "ge"
+   "~"  "tilde"
+   "^"  "hat"
+   "N"  "nabla"
+   "I"  "infty"
+   "A"  "forall"
+   "E"  "exists"
+   "/"  "not"
+   "i"  "in"
+   "*"  "times"
+   "."  "cdot"
+   ":"  "colon"
+   "{"  "sub"
+   "}"  "supset"
+   "["  "sube"
+   "]"  "supe"
+   "0"  "empty"
+   "\\" "setminus"
+   "+"  "cup"
+   "-"  "cap"
+   "("  "langle"
+   ")"  "rangle"
+   ;"|" doesn't seem to get registered possibly because "|" is used as a special token in Ace
+   "|"  "vee"
+   "&"  "wedge"})
+
+(def ctrl-keymap
+  (s/transform s/MAP-KEYS (partial str "ctrl+") {"e" "exp"
+                                                 "s" "sin"
+                                                 ;"ctrl+c" doesn't seem to get registered possibly because "ctrl+c" is handled separately in Ace
+                                                 "c" "cos"
+                                                 "^" "sup"
+                                                 "_" "inf"
+                                                 "d" "det"
+                                                 "l" "lim"
+                                                 "t" "tan"}))
+
+(def math-keymap
+  (merge default-keymap lower-keymap upper-keymap symbol-keymap ctrl-keymap))
+
 (defc editor
       [& _]
-      (let [state (atom {})]
+      (let [state (atom {:math :other})]
         (r/create-class
           {:component-did-mount
            (fn [_]
@@ -1205,11 +1317,14 @@
                                           get-status-text
                                           editor-keyup)
                                       (swap! state
-                                             (partial s/setval*
-                                                      :backtick
-                                                      (-> event*
-                                                          .-key
-                                                          (= "`"))))))))
+                                             (partial s/transform*
+                                                      :math
+                                                      #(case (.-key event*)
+                                                         "`" :backtick
+                                                         "c" (case %
+                                                               :backtick :c
+                                                               :other)
+                                                         :other)))))))
            :component-did-update
            (fn [_]
              (if (-> @state
@@ -1222,14 +1337,20 @@
            (fn [mode text]
              (swap! state (partial s/setval* :mode mode))
              [:> ace-editor
-              {:commands         [{:name    "`"
-                                   :bindKey "`"
-                                   :exec    aid/nop}
-                                  {:bindKey "l"
-                                   :exec    #(.insert (:editor @state)
-                                                      (aid/casep @state
-                                                        :backtick "\\lambda"
-                                                        "l"))}]
+              {:commands         (->> math-keymap
+                                      (map (get-command state))
+                                      (concat
+                                        [{:bindKey "`"
+                                          :exec    aid/nop
+                                          :name    "backtick"}
+                                         {:bindKey "c"
+                                          :exec    #(.insert
+                                                      (:editor @state)
+                                                      (case (:math @state)
+                                                        :backtick ""
+                                                        :c (get-mathcal "c")
+                                                        "c"))
+                                          :name    "c"}]))
                :focus            (= :insert mode)
                :keyboard-handler "vim"
                :mode             "latex"
@@ -1586,7 +1707,7 @@
 (def bind-keymap
   (partial run! (partial apply bind)))
 
-(def keymap
+(def graph-keymap
   {"$"      dollar
    ":"      command
    "\\"     implication
@@ -1606,7 +1727,7 @@
    "x"      delete
    "y"      yank})
 
-(bind-keymap keymap)
+(bind-keymap graph-keymap)
 
 (.config.loadModule ace
                     "ace/keyboard/vim"
