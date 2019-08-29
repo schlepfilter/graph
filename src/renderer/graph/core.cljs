@@ -65,6 +65,7 @@
           escape
           insert-normal
           insert-insert
+          insert-append
           command
           editor-keydown
           editor-keyup
@@ -975,12 +976,16 @@
        (frp/stepper "")))
 
 (def mode-event
-  (m/<> (aid/<$ :normal normal)
-        (aid/<$ :insert (m/<> insert-normal insert-insert source-append-move))
-        (aid/<$ :command command)))
+  (m/<> (aid/<$ [:normal] normal)
+        (aid/<$ [:insert :insert] (m/<> insert-normal insert-insert source-append-move))
+        (aid/<$ [:insert :append] (m/<> insert-append))
+        (aid/<$ [:command] command)))
 
 (def mode-behavior
-  (frp/stepper :normal mode-event))
+  (frp/stepper [:normal] mode-event))
+
+(def outer-mode
+  (m/<$> first mode-behavior))
 
 (def edge-mode
   (->> source-in
@@ -1344,6 +1349,14 @@
            (fn [_]
              (if (-> @state
                      :mode
+                     last
+                     (= :append))
+               (.moveCursorTo (:editor @state)
+                              js/Number.MAX_VALUE
+                              js/Number.MAX_VALUE))
+             (if (-> @state
+                     :mode
+                     first
                      (= :normal))
                (-> @state
                    :editor
@@ -1366,7 +1379,9 @@
                                                         :c (get-mathcal "c")
                                                         "c"))
                                           :name    "c"}]))
-               :focus            (= :insert mode)
+               :focus            (-> mode
+                                     first
+                                     (= :insert))
                :keyboard-handler "vim"
                :mode             "latex"
                :on-change        #(insert-typing %)
@@ -1672,7 +1687,7 @@
     cursor-y-behavior))
 
 (def command-view
-  ((aid/lift-a command-component) mode-behavior command-text))
+  ((aid/lift-a command-component) outer-mode command-text))
 
 (def editor-view
   ((aid/lift-a editor) mode-behavior insert-text))
@@ -1731,6 +1746,7 @@
    "ctrl+r" redo
    "ctrl+v" blockwise-visual-toggle
    "escape" escape
+   "a"      insert-append
    "A"      append
    "b"      back
    "h"      left
