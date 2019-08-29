@@ -238,7 +238,7 @@
   (loom/digraph))
 
 (def exit?
-  #{"Control" "Escape"})
+  (partial = "Escape"))
 
 (def command-exit
   (->> command-keydown
