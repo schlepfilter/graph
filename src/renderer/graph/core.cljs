@@ -1086,19 +1086,15 @@
 (def initial-maximum
   0)
 
-(def maximum-pixel
-  ;https://stackoverflow.com/a/16637689
-  33554428)
-
 (def client-width
   (->> dom
        (m/<$> :client-width)
-       (frp/stepper maximum-pixel)))
+       (frp/stepper js/Number.MAX_VALUE)))
 
 (def client-height
   (->> dom
        (m/<$> :client-height)
-       (frp/stepper maximum-pixel)))
+       (frp/stepper js/Number.MAX_VALUE)))
 
 (def editing-bound
   (->> (frp/snapshot valid-bound-event
@@ -1413,7 +1409,7 @@
 
 (defn math-node
   [& _]
-  (let [state (r/atom {:height maximum-pixel})]
+  (let [state (r/atom {:height js/Number.MAX_VALUE})]
     (fn [mode edge-node [id* {:keys [value x y]}]]
       [:g
        [:rect (merge (s/transform :height shrink @state)
