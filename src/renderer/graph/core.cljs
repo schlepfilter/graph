@@ -1278,13 +1278,14 @@
    "-"  "cap"
    "("  "langle"
    ")"  "rangle"
-   ;TODO uncomment the following line when Ace starts to support `|`
-   ;"|"  "vee"
+   ;"|" doesn't seem to get registered possibly because "|" is used as a special token in Ace
+   "|"  "vee"
    "&"  "wedge"})
 
 (def ctrl-keymap
   (s/transform s/MAP-KEYS (partial str "ctrl+") {"e" "exp"
                                                  "s" "sin"
+                                                 ;"ctrl+c" doesn't seem to get registered possibly because "ctrl+c" is handled separately in Ace
                                                  "c" "cos"
                                                  "^" "sup"
                                                  "_" "inf"
