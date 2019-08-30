@@ -993,7 +993,9 @@
 
 (def mode-event
   (m/<> (aid/<$ [:normal] normal)
-        (aid/<$ [:insert :insert] (m/<> insert-normal insert-insert source-append-move))
+        (aid/<$ [:insert
+                 :insert]
+                (m/<> insert-normal insert-insert source-append-move))
         (aid/<$ [:insert :append] (m/<> insert-append))
         (aid/<$ [:command] command)))
 
