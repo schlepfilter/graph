@@ -21,13 +21,16 @@
        (let [window-state (window-state-keeper. {})
              window (helpers/electron.BrowserWindow. window-state)]
          (doto window
-           (.on "close" (fn [_]
-                          (.quit app)))
+           (.on "close" (fn [event*]
+                          (.preventDefault event*)
+                          (.webContents.send window
+                                             helpers/channel
+                                             (clj->js #js ["close"]))))
            (.webContents.on "did-finish-load"
                             (fn []
                               (frp/run #(.webContents.send window
                                                            helpers/channel
-                                                           %)
+                                                           #js ["open" %])
                                        file-path)
                               (frp/activate)))
            (.loadURL

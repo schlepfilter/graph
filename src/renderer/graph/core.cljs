@@ -76,7 +76,8 @@
           implication
           submission
           undo
-          redo)
+          redo
+          close)
 
 (def os
   (js/require "os"))
@@ -1050,7 +1051,8 @@
                       history-event)
                (m/<$> (comp zipmap-history-x-y
                             rest)
-                      (frp/snapshot current-file-path-event
+                      (frp/snapshot (m/<> current-file-path-event
+                                          close)
                                     history-behavior
                                     cursor-x-behavior
                                     cursor-y-behavior)))
@@ -1796,11 +1798,21 @@
                                                     ["<Esc>"]
                                                     ["insert" "command"])))
 
-(.ipcRenderer.on helpers/electron helpers/channel (comp potential-file-path
-                                                        last
-                                                        vector))
+(.ipcRenderer.on helpers/electron
+                 helpers/channel
+                 (comp (aid/build (partial apply aid/funcall)
+                                  (comp {"close" close
+                                         "open"  potential-file-path}
+                                        first)
+                                  rest)
+                       last
+                       vector))
 
 (frp/run (partial apply spit) modification)
+
+(frp/run (fn [_]
+           (helpers/electron.remote.app.exit))
+         close)
 
 (frp/activate)
 
