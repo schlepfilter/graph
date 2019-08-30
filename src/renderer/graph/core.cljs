@@ -169,7 +169,7 @@
 (def potential-file-path
   (get-potential-path "e"))
 
-(def current-file-path
+(def current-file-path-event
   (core/filter (aid/build or
                           (complement fs/fexists?)
                           (aid/build and
@@ -181,10 +181,10 @@
   (->> "cd"
        get-potential-path
        (core/filter fs/fexists?)
-       (m/<> (m/<$> fs/dirname current-file-path))))
+       (m/<> (m/<$> fs/dirname current-file-path-event))))
 
 (def opened
-  (->> current-file-path
+  (->> current-file-path-event
        (m/<$> (complement empty?))
        (frp/stepper false)))
 
@@ -1022,15 +1022,6 @@
 (def file-path-placeholder
   "")
 
-(def buffer-entry
-  (->> current-file-path
-       (frp/stepper file-path-placeholder)
-       (frp/snapshot (m/<$> (partial zipmap [:history :x :y])
-                            (frp/snapshot history
-                                          cursor-x-behavior
-                                          cursor-y-behavior)))
-       (m/<$> reverse)))
-
 (aid/defcurried move*
   [to from f m]
   (->> m
@@ -1039,15 +1030,30 @@
                             (partial s/select-one* from)))
        (s/setval from s/NONE)))
 
+(def current-file-path-behavior
+  (frp/stepper file-path-placeholder current-file-path-event))
+
+(def zipmap-history-x-y
+  (partial zipmap [:history :x :y]))
+
 (def modification
-  (->> buffer-entry
-       (m/<$> (partial s/transform*
-                       s/LAST
-                       (move* :content
-                              :history
-                              (comp (partial s/transform* :edge graph/edges)
-                                    (partial s/transform* :node :canonical)
-                                    ffirst))))
+  (->> current-file-path-behavior
+       (frp/snapshot (m/<$> zipmap-history-x-y
+                            (frp/snapshot history
+                                          cursor-x-behavior
+                                          cursor-y-behavior)))
+       (m/<$> (comp (partial s/transform*
+                             s/LAST
+                             (move* :content
+                                    :history
+                                    (comp (partial s/transform*
+                                                   :edge
+                                                   graph/edges)
+                                          (partial s/transform*
+                                                   :node
+                                                   :canonical)
+                                          ffirst)))
+                    reverse))
        (core/remove (fn [[path* m]]
                       (or (empty? path*)
                           (and (fs/fexists? path*)
@@ -1062,11 +1068,18 @@
    :y       initial-cursor})
 
 (def sink-buffer
-  (->> buffer-entry
-       (m/<$> (partial apply hash-map))
+  (->> (frp/snapshot current-file-path-event
+                     current-file-path-behavior
+                     (frp/stepper initial-history history)
+                     cursor-x-behavior
+                     cursor-y-behavior)
+       (m/<$> (aid/build hash-map
+                         second
+                         (comp zipmap-history-x-y
+                               (partial drop 2))))
        core/merge
        (frp/stepper {})
-       (frp/snapshot current-file-path)
+       (frp/snapshot current-file-path-event)
        (m/<$> (fn [[k m]]
                 (aid/casep k
                   fs/fexists? (->> k
@@ -1724,7 +1737,7 @@
              source-undo-redo-x           sink-undo-redo-x
              source-undo-redo-y           sink-undo-redo-y})
 
-(frp/run #(oset! js/document "title" %) current-file-path)
+(frp/run #(oset! js/document "title" %) current-file-path-event)
 
 (frp/run (partial (aid/flip r/render) (js/document.getElementById "app"))
          app-view)
