@@ -598,10 +598,17 @@
                :history)
          source-buffer))
 
+(def valid-undo?
+  (comp multiton?
+        first))
+
+(def valid-redo?
+  (comp not-empty
+        last))
+
 (def history-event
   (->> action
-       (m/<> (aid/<$ (aid/if-then (comp multiton?
-                                        first)
+       (m/<> (aid/<$ (aid/if-then valid-undo?
                                   (comp (partial s/transform*
                                                  s/FIRST
                                                  rest)
@@ -609,8 +616,7 @@
                                                         s/BEFORE-ELEM]
                                                        ffirst)))
                      undo)
-             (aid/<$ (aid/if-else (comp empty?
-                                        last)
+             (aid/<$ (aid/if-then valid-redo?
                                   (comp (partial s/transform* s/LAST rest)
                                         (aid/transfer* [s/FIRST
                                                         s/BEFORE-ELEM]
@@ -634,8 +640,19 @@
 (def sink-undo-redo-y
   (get-undo-redo-cursor :y))
 
+(def history-behavior
+  (frp/stepper initial-history history-event))
+
+(defn get-valid
+  [f e]
+  (core/filter (comp f
+                     last)
+               (frp/snapshot e
+                             history-behavior)))
+
 (def sink-undo-redo
-  (m/<> undo redo))
+  (m/<> (get-valid valid-undo? undo)
+        (get-valid valid-redo? redo)))
 
 (def edge-event
   (m/<$> :edge content))
@@ -1036,9 +1053,6 @@
 
 (def zipmap-history-x-y
   (partial zipmap [:history :x :y]))
-
-(def history-behavior
-  (frp/stepper initial-history history-event))
 
 (def modification
   (->> (frp/snapshot
