@@ -57,8 +57,6 @@
           word
           back
           delete
-          ;TODO: when mousetrap starts to support all keys capture, replace "y" with all keys capture
-          ;https://github.com/ccampbell/mousetrap/issues/134
           yank
           paste
           dom
@@ -1801,6 +1799,8 @@
    "u"      undo
    "w"      word
    "x"      delete
+   ;TODO: when mousetrap starts to support all keys capture, replace "y" with all keys capture
+   ;https://github.com/ccampbell/mousetrap/issues/134
    "y"      yank})
 
 (bind-keymap graph-keymap)
