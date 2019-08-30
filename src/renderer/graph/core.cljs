@@ -1056,7 +1056,7 @@
 
 (def modification
   (->> (frp/snapshot
-         ;TODO don't update modification when reset occurs
+         ;TODO don't save x and y in each file
          (m/<> (m/<$> (aid/build (partial s/setval* :history)
                                  identity
                                  (comp (partial (aid/flip select-keys)
