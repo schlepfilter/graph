@@ -1083,6 +1083,7 @@
                                                    :canonical)
                                           ffirst)))
                     reverse))
+       ;TODO apply point-free style
        (core/remove (fn [[path* m]]
                       (or (empty? path*)
                           (and (fs/fexists? path*)
