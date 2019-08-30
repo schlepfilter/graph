@@ -1351,9 +1351,9 @@
                      :mode
                      last
                      (= :append))
-               (.moveCursorTo (:editor @state)
-                              js/Number.MAX_VALUE
-                              js/Number.MAX_VALUE))
+               (-> @state
+                   :editor
+                   (.moveCursorTo js/Number.MAX_VALUE js/Number.MAX_VALUE)))
              (if (-> @state
                      :mode
                      first
