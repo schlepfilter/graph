@@ -597,7 +597,7 @@
                :history)
          source-buffer))
 
-(def history
+(def history-event
   (->> action
        (m/<> (aid/<$ (aid/if-then (comp multiton?
                                         first)
@@ -619,7 +619,7 @@
        (frp/accum initial-history)))
 
 (def content
-  (m/<$> ffirst history))
+  (m/<$> ffirst history-event))
 
 (def get-undo-redo-cursor
   #(m/<$> last (frp/snapshot source-undo-redo
@@ -989,7 +989,7 @@
 
 (def edge-mode
   (->> source-in
-       (m/<> mode-event history)
+       (m/<> mode-event history-event)
        (aid/<$ false)
        (m/<> (aid/<$ true edge-node-event))
        (frp/stepper false)))
@@ -1036,12 +1036,24 @@
 (def zipmap-history-x-y
   (partial zipmap [:history :x :y]))
 
+(def history-behavior
+  (frp/stepper initial-history history-event))
+
 (def modification
-  (->> current-file-path-behavior
-       (frp/snapshot (m/<$> zipmap-history-x-y
-                            (frp/snapshot history
-                                          cursor-x-behavior
-                                          cursor-y-behavior)))
+  (->> (frp/snapshot
+         (m/<> (m/<$> (aid/build (partial s/setval* :history)
+                                 identity
+                                 (comp (partial (aid/flip select-keys)
+                                                [:x :y])
+                                       ffirst))
+                      history-event)
+               (m/<$> (comp zipmap-history-x-y
+                            rest)
+                      (frp/snapshot current-file-path-event
+                                    history-behavior
+                                    cursor-x-behavior
+                                    cursor-y-behavior)))
+         current-file-path-behavior)
        (m/<$> (comp (partial s/transform*
                              s/LAST
                              (move* :content
@@ -1070,7 +1082,7 @@
 (def sink-buffer
   (->> (frp/snapshot current-file-path-event
                      current-file-path-behavior
-                     (frp/stepper initial-history history)
+                     history-behavior
                      cursor-x-behavior
                      cursor-y-behavior)
        (m/<$> (aid/build hash-map
