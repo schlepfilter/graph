@@ -1096,9 +1096,9 @@
                                    (= m))))))))
 
 (def position-path
-  (path.join (electron.remote.app.getPath "cache")
-             helpers/app-name
-             "position.edn"))
+  (-> "cache"
+      (electron.remote.app.getPath)
+      (path.join helpers/app-name "position.edn")))
 
 (def previous-path-position
   (m/<$> (fn [[_ path* x y]]
