@@ -83,6 +83,9 @@
 (def path
   (js/require "path"))
 
+(def electron
+  (js/require "electron"))
+
 (def home
   (.homedir os))
 
@@ -1815,7 +1818,7 @@
                                                     ["<Esc>"]
                                                     ["insert" "command"])))
 
-(.ipcRenderer.on helpers/electron
+(.ipcRenderer.on electron
                  helpers/channel
                  (comp (aid/build (partial apply aid/funcall)
                                   (comp {"close" close
@@ -1828,7 +1831,7 @@
 (frp/run (partial apply spit) modification)
 
 (frp/run (fn [_]
-           (helpers/electron.remote.app.exit))
+           (electron.remote.app.exit))
          close)
 
 (frp/activate)

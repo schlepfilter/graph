@@ -4,6 +4,9 @@
             [frp.core :as frp]
             [graph.helpers :as helpers]))
 
+(def electron
+  (js/require "electron"))
+
 (def path
   (js/require "path"))
 
@@ -13,13 +16,13 @@
 (frp/defe file-path)
 
 (def app
-  (.-app helpers/electron))
+  electron.app)
 
 (.on app
      "ready"
      (fn [_]
        (let [window-state (window-state-keeper. {})
-             window (helpers/electron.BrowserWindow. window-state)]
+             window (electron.BrowserWindow. window-state)]
          (doto window
            (.on "close" (fn [event*]
                           (.preventDefault event*)
