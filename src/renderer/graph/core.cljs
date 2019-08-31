@@ -35,14 +35,15 @@
           source-dimension-register
           source-directory
           source-edge-register
-          source-undo-redo
           source-in
           source-line-segment
           source-dollar-move
+          source-nearest-move
           source-node-register
           source-scroll-x
           source-scroll-y
           source-transform-edge-action
+          source-undo-redo
           source-undo-redo-x
           source-undo-redo-y
           append
@@ -53,15 +54,16 @@
           right
           carrot
           dollar
+          word
+          back
           delete
-          ;TODO: when mousetrap starts to support all keys capture, replace "y" with all keys capture
-          ;https://github.com/ccampbell/mousetrap/issues/134
           yank
           paste
           dom
           escape
           insert-normal
           insert-insert
+          insert-append
           command
           editor-keydown
           editor-keyup
@@ -72,13 +74,17 @@
           implication
           submission
           undo
-          redo)
+          redo
+          close)
 
 (def os
   (js/require "os"))
 
 (def path
   (js/require "path"))
+
+(def electron
+  (js/require "electron"))
 
 (def home
   (.homedir os))
@@ -165,7 +171,7 @@
 (def potential-file-path
   (get-potential-path "e"))
 
-(def current-file-path
+(def current-file-path-event
   (core/filter (aid/build or
                           (complement fs/fexists?)
                           (aid/build and
@@ -177,10 +183,10 @@
   (->> "cd"
        get-potential-path
        (core/filter fs/fexists?)
-       (m/<> (m/<$> fs/dirname current-file-path))))
+       (m/<> (m/<$> fs/dirname current-file-path-event))))
 
 (def opened
-  (->> current-file-path
+  (->> current-file-path-event
        (m/<$> (complement empty?))
        (frp/stepper false)))
 
@@ -205,13 +211,14 @@
        (m/<> (aid/<$ initial-cursor carrot)
              source-undo-redo-x
              source-dollar-move
+             (m/<$> first source-nearest-move)
              source-append-move)
        (get-cursor-event right left)))
 
 (def cursor-y-event
   (->> source-buffer
        (m/<$> :y)
-       (m/<> source-undo-redo-y)
+       (m/<> source-undo-redo-y (m/<$> last source-nearest-move))
        (get-cursor-event down up)))
 
 (def cursor-x-behavior
@@ -592,10 +599,17 @@
                :history)
          source-buffer))
 
-(def history
+(def valid-undo?
+  (comp multiton?
+        first))
+
+(def valid-redo?
+  (comp not-empty
+        last))
+
+(def history-event
   (->> action
-       (m/<> (aid/<$ (aid/if-then (comp multiton?
-                                        first)
+       (m/<> (aid/<$ (aid/if-then valid-undo?
                                   (comp (partial s/transform*
                                                  s/FIRST
                                                  rest)
@@ -603,8 +617,7 @@
                                                         s/BEFORE-ELEM]
                                                        ffirst)))
                      undo)
-             (aid/<$ (aid/if-else (comp empty?
-                                        last)
+             (aid/<$ (aid/if-then valid-redo?
                                   (comp (partial s/transform* s/LAST rest)
                                         (aid/transfer* [s/FIRST
                                                         s/BEFORE-ELEM]
@@ -614,7 +627,7 @@
        (frp/accum initial-history)))
 
 (def content
-  (m/<$> ffirst history))
+  (m/<$> ffirst history-event))
 
 (def get-undo-redo-cursor
   #(m/<$> last (frp/snapshot source-undo-redo
@@ -628,8 +641,19 @@
 (def sink-undo-redo-y
   (get-undo-redo-cursor :y))
 
+(def history-behavior
+  (frp/stepper initial-history history-event))
+
+(defn get-valid
+  [f e]
+  (core/filter (comp f
+                     last)
+               (frp/snapshot e
+                             history-behavior)))
+
 (def sink-undo-redo
-  (m/<> undo redo))
+  (m/<> (get-valid valid-undo? undo)
+        (get-valid valid-redo? redo)))
 
 (def edge-event
   (m/<$> :edge content))
@@ -803,13 +827,19 @@
                 (constantly default)
                 (avl/nearest coll test x))))
 
+(def get-nearest-key
+  (comp first
+        (partial apply nearest)
+        (partial s/transform* s/LAST vector)
+        vector))
+
 (aid/defcurried get-end
   [f y id*]
   (aid/if-then-else (comp (partial = y)
                           last)
                     f
                     (constantly 0)
-                    (first (nearest id* < [0 (inc y)] [[0 y]]))))
+                    (get-nearest-key id* < [0 (inc y)] [0 y])))
 
 (def sink-dollar-move
   (m/<$> (comp (partial apply (get-end first))
@@ -832,6 +862,15 @@
                        cursor-y-behavior
                        node-behavior
                        valid-bound-behavior)))
+
+(def sink-nearest-move
+  (m/<$> (fn [[f x y node]]
+           (get-nearest-key (:id node) f [x y] [x y]))
+         (frp/snapshot (m/<> (aid/<$ > word)
+                             (aid/<$ < back))
+                       cursor-x-behavior
+                       cursor-y-behavior
+                       node-behavior)))
 
 (def make-directional
   #(comp (partial apply =)
@@ -956,16 +995,22 @@
        (frp/stepper "")))
 
 (def mode-event
-  (m/<> (aid/<$ :normal normal)
-        (aid/<$ :insert (m/<> insert-normal insert-insert source-append-move))
-        (aid/<$ :command command)))
+  (m/<> (aid/<$ [:normal] normal)
+        (aid/<$ [:insert
+                 :insert]
+                (m/<> insert-normal insert-insert source-append-move))
+        (aid/<$ [:insert :append] (m/<> insert-append))
+        (aid/<$ [:command] command)))
 
 (def mode-behavior
-  (frp/stepper :normal mode-event))
+  (frp/stepper [:normal] mode-event))
+
+(def outer-mode
+  (m/<$> first mode-behavior))
 
 (def edge-mode
   (->> source-in
-       (m/<> mode-event history)
+       (m/<> mode-event history-event)
        (aid/<$ false)
        (m/<> (aid/<$ true edge-node-event))
        (frp/stepper false)))
@@ -998,15 +1043,6 @@
 (def file-path-placeholder
   "")
 
-(def buffer-entry
-  (->> current-file-path
-       (frp/stepper file-path-placeholder)
-       (frp/snapshot (m/<$> (partial zipmap [:history :x :y])
-                            (frp/snapshot history
-                                          cursor-x-behavior
-                                          cursor-y-behavior)))
-       (m/<$> reverse)))
-
 (aid/defcurried move*
   [to from f m]
   (->> m
@@ -1015,15 +1051,42 @@
                             (partial s/select-one* from)))
        (s/setval from s/NONE)))
 
+(def current-file-path-behavior
+  (frp/stepper file-path-placeholder current-file-path-event))
+
+(def zipmap-history-x-y
+  (partial zipmap [:history :x :y]))
+
 (def modification
-  (->> buffer-entry
-       (m/<$> (partial s/transform*
-                       s/LAST
-                       (move* :content
-                              :history
-                              (comp (partial s/transform* :edge graph/edges)
-                                    (partial s/transform* :node :canonical)
-                                    ffirst))))
+  (->> (frp/snapshot
+         ;TODO don't save x and y in each file
+         (m/<> (m/<$> (aid/build (partial s/setval* :history)
+                                 identity
+                                 (comp (partial (aid/flip select-keys)
+                                                [:x :y])
+                                       ffirst))
+                      history-event)
+               (m/<$> (comp zipmap-history-x-y
+                            rest)
+                      (frp/snapshot (m/<> current-file-path-event
+                                          close)
+                                    history-behavior
+                                    cursor-x-behavior
+                                    cursor-y-behavior)))
+         current-file-path-behavior)
+       (m/<$> (comp (partial s/transform*
+                             s/LAST
+                             (move* :content
+                                    :history
+                                    (comp (partial s/transform*
+                                                   :edge
+                                                   graph/edges)
+                                          (partial s/transform*
+                                                   :node
+                                                   :canonical)
+                                          ffirst)))
+                    reverse))
+       ;TODO apply point-free style
        (core/remove (fn [[path* m]]
                       (or (empty? path*)
                           (and (fs/fexists? path*)
@@ -1038,11 +1101,18 @@
    :y       initial-cursor})
 
 (def sink-buffer
-  (->> buffer-entry
-       (m/<$> (partial apply hash-map))
+  (->> (frp/snapshot current-file-path-event
+                     current-file-path-behavior
+                     history-behavior
+                     cursor-x-behavior
+                     cursor-y-behavior)
+       (m/<$> (aid/build hash-map
+                         second
+                         (comp zipmap-history-x-y
+                               (partial drop 2))))
        core/merge
        (frp/stepper {})
-       (frp/snapshot current-file-path)
+       (frp/snapshot current-file-path-event)
        (m/<$> (fn [[k m]]
                 (aid/casep k
                   fs/fexists? (->> k
@@ -1067,19 +1137,15 @@
 (def initial-maximum
   0)
 
-(def maximum-pixel
-  ;https://stackoverflow.com/a/16637689
-  33554428)
-
 (def client-width
   (->> dom
        (m/<$> :client-width)
-       (frp/stepper maximum-pixel)))
+       (frp/stepper js/Number.MAX_VALUE)))
 
 (def client-height
   (->> dom
        (m/<$> :client-height)
-       (frp/stepper maximum-pixel)))
+       (frp/stepper js/Number.MAX_VALUE)))
 
 (def editing-bound
   (->> (frp/snapshot valid-bound-event
@@ -1329,6 +1395,14 @@
            (fn [_]
              (if (-> @state
                      :mode
+                     last
+                     (= :append))
+               (-> @state
+                   :editor
+                   (.moveCursorTo js/Number.MAX_VALUE js/Number.MAX_VALUE)))
+             (if (-> @state
+                     :mode
+                     first
                      (= :normal))
                (-> @state
                    :editor
@@ -1351,7 +1425,9 @@
                                                         :c (get-mathcal "c")
                                                         "c"))
                                           :name    "c"}]))
-               :focus            (= :insert mode)
+               :focus            (-> mode
+                                     first
+                                     (= :insert))
                :keyboard-handler "vim"
                :mode             "latex"
                :on-change        #(insert-typing %)
@@ -1394,7 +1470,7 @@
 
 (defn math-node
   [& _]
-  (let [state (r/atom {:height maximum-pixel})]
+  (let [state (r/atom {:height js/Number.MAX_VALUE})]
     (fn [mode edge-node [id* {:keys [value x y]}]]
       [:g
        [:rect (merge (s/transform :height shrink @state)
@@ -1657,7 +1733,7 @@
     cursor-y-behavior))
 
 (def command-view
-  ((aid/lift-a command-component) mode-behavior command-text))
+  ((aid/lift-a command-component) outer-mode command-text))
 
 (def editor-view
   ((aid/lift-a editor) mode-behavior insert-text))
@@ -1686,6 +1762,7 @@
              source-in                    sink-in
              source-line-segment          sink-line-segment
              source-dollar-move           sink-dollar-move
+             source-nearest-move          sink-nearest-move
              source-node-register         sink-node-register
              source-scroll-x              sink-scroll-x
              source-scroll-y              sink-scroll-y
@@ -1693,7 +1770,7 @@
              source-undo-redo-x           sink-undo-redo-x
              source-undo-redo-y           sink-undo-redo-y})
 
-(frp/run #(oset! js/document "title" %) current-file-path)
+(frp/run #(oset! js/document "title" %) current-file-path-event)
 
 (frp/run (partial (aid/flip r/render) (js/document.getElementById "app"))
          app-view)
@@ -1715,7 +1792,9 @@
    "ctrl+r" redo
    "ctrl+v" blockwise-visual-toggle
    "escape" escape
+   "a"      insert-append
    "A"      append
+   "b"      back
    "h"      left
    "i"      insert-insert
    "j"      down
@@ -1724,7 +1803,10 @@
    "p"      paste
    "space"  insert-normal
    "u"      undo
+   "w"      word
    "x"      delete
+   ;TODO: when mousetrap starts to support all keys capture, replace "y" with all keys capture
+   ;https://github.com/ccampbell/mousetrap/issues/134
    "y"      yank})
 
 (bind-keymap graph-keymap)
@@ -1736,11 +1818,21 @@
                                                     ["<Esc>"]
                                                     ["insert" "command"])))
 
-(.ipcRenderer.on helpers/electron helpers/channel (comp potential-file-path
-                                                        last
-                                                        vector))
+(.ipcRenderer.on electron
+                 helpers/channel
+                 (comp (aid/build (partial apply aid/funcall)
+                                  (comp {"close" close
+                                         "open"  potential-file-path}
+                                        first)
+                                  rest)
+                       last
+                       vector))
 
 (frp/run (partial apply spit) modification)
+
+(frp/run (fn [_]
+           (electron.remote.app.exit))
+         close)
 
 (frp/activate)
 
