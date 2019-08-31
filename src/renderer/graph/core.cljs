@@ -1095,6 +1095,33 @@
                                    edn/read-string
                                    (= m))))))))
 
+(def position-path
+  (path.join (electron.remote.app.getPath "cache")
+             helpers/app-name
+             "position.edn"))
+
+(def previous-path-position
+  (m/<$> (fn [[_ path* x y]]
+           {path* {:x x
+                   :y y}})
+         (frp/snapshot (m/<> current-file-path-event
+                             close)
+                       current-file-path-behavior
+                       cursor-x-behavior
+                       cursor-y-behavior)))
+
+(def initial-path-position
+  (aid/casep position-path
+    fs/fexists? (-> position-path
+                    slurp
+                    edn/read-string)
+    {}))
+
+(def path-position
+  (->> previous-path-position
+       (m/<> (frp/event initial-path-position))
+       core/merge))
+
 (def initial-buffer
   {:history initial-history
    :x       initial-cursor
