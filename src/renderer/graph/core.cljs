@@ -1101,9 +1101,11 @@
       (path.join helpers/app-name "position.edn")))
 
 (def previous-path-position
-  (m/<$> (fn [[_ path* x y]]
-           {path* {:x x
-                   :y y}})
+  (m/<$> (comp (aid/build array-map
+                          first
+                          (comp (partial zipmap [:x :y])
+                                rest))
+               rest)
          (frp/snapshot (m/<> current-file-path-event
                              close)
                        current-file-path-behavior
