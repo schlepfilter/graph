@@ -1789,16 +1789,16 @@
              source-buffer                sink-buffer
              source-directory             sink-directory
              source-dimension-register    sink-dimension-register
+             source-dollar-move           sink-dollar-move
              source-edge-register         sink-edge-register
-             source-undo-redo             sink-undo-redo
              source-in                    sink-in
              source-line-segment          sink-line-segment
-             source-dollar-move           sink-dollar-move
              source-nearest-move          sink-nearest-move
              source-node-register         sink-node-register
              source-scroll-x              sink-scroll-x
              source-scroll-y              sink-scroll-y
              source-transform-edge-action sink-transform-edge-action
+             source-undo-redo             sink-undo-redo
              source-undo-redo-x           sink-undo-redo-x
              source-undo-redo-y           sink-undo-redo-y})
 
