@@ -1097,6 +1097,7 @@
   100)
 
 (def jumplist
+  ;TODO implement jump
   (->> previous-path-position
        core/vector
        (m/<$> (comp (partial take maximum-jumplist-count)
