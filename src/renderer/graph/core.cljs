@@ -1128,7 +1128,9 @@
        (frp/stepper initial-path-position)
        (frp/snapshot current-file-path-event)
        (m/<$> (partial apply (fn [path* m]
-                               (get m path* (repeat 2 initial-cursor)))))))
+                               (->> initial-cursor
+                                    (repeat 2)
+                                    (get m path*)))))))
 
 (def initial-buffer
   {:history initial-history
