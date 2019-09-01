@@ -41,12 +41,12 @@
   (js/require "electron"))
 
 (frp/defe source-append-move
-          source-buffer
           source-dimension-register
           source-directory
           source-edge-register
           source-in
           source-line-segment
+          source-loaded-history
           source-dollar-move
           source-nearest-move
           source-node-register
@@ -597,9 +597,7 @@
                 :y    initial-cursor}))
 
 (def reset
-  (m/<$> (comp constantly
-               :history)
-         source-buffer))
+  (m/<$> constantly source-loaded-history))
 
 (def valid-undo?
   (comp multiton?
@@ -609,7 +607,7 @@
   (comp not-empty
         last))
 
-(def history-event
+(def ongoing-history-event
   (->> action
        (m/<> (aid/<$ (aid/if-then valid-undo?
                                   (comp (partial s/transform*
@@ -629,7 +627,7 @@
        (frp/accum initial-history)))
 
 (def content
-  (m/<$> ffirst history-event))
+  (m/<$> ffirst ongoing-history-event))
 
 (def get-undo-redo-cursor
   #(m/<$> last (frp/snapshot source-undo-redo
@@ -643,15 +641,15 @@
 (def sink-undo-redo-y
   (get-undo-redo-cursor :y))
 
-(def history-behavior
-  (frp/stepper initial-history history-event))
+(def ongoing-history-behavior
+  (frp/stepper initial-history ongoing-history-event))
 
 (defn get-valid
   [f e]
   (core/filter (comp f
                      last)
                (frp/snapshot e
-                             history-behavior)))
+                             ongoing-history-behavior)))
 
 (def sink-undo-redo
   (m/<> (get-valid valid-undo? undo)
@@ -1012,7 +1010,7 @@
 
 (def edge-mode
   (->> source-in
-       (m/<> mode-event history-event)
+       (m/<> mode-event ongoing-history-event)
        (aid/<$ false)
        (m/<> (aid/<$ true edge-node-event))
        (frp/stepper false)))
@@ -1045,48 +1043,25 @@
 (def file-path-placeholder
   "")
 
-(aid/defcurried move*
-  [to from f m]
-  (->> m
-       (aid/transfer* to
-                      (comp f
-                            (partial s/select-one* from)))
-       (s/setval from s/NONE)))
-
 (def current-file-path-behavior
   (frp/stepper file-path-placeholder current-file-path-event))
 
-(def zipmap-history-x-y
-  (partial zipmap [:history :x :y]))
-
 (def modification
-  (->> (frp/snapshot
-         ;TODO don't save x and y in each file
-         (m/<> (m/<$> (aid/build (partial s/setval* :history)
-                                 identity
-                                 (comp (partial (aid/flip select-keys)
-                                                [:x :y])
-                                       ffirst))
-                      history-event)
-               (m/<$> (comp zipmap-history-x-y
-                            rest)
-                      (frp/snapshot (m/<> current-file-path-event
-                                          close)
-                                    history-behavior
-                                    cursor-x-behavior
-                                    cursor-y-behavior)))
-         current-file-path-behavior)
+  (->> (frp/snapshot (m/<> ongoing-history-event
+                           (m/<$> last
+                                  (frp/snapshot (m/<> current-file-path-event
+                                                      close)
+                                                ongoing-history-behavior)))
+                     current-file-path-behavior)
        (m/<$> (comp (partial s/transform*
                              s/LAST
-                             (move* :content
-                                    :history
-                                    (comp (partial s/transform*
-                                                   :edge
-                                                   graph/edges)
-                                          (partial s/transform*
-                                                   :node
-                                                   :canonical)
-                                          ffirst)))
+                             (comp (partial s/transform*
+                                            :edge
+                                            graph/edges)
+                                   (partial s/transform*
+                                            :node
+                                            :canonical)
+                                   ffirst))
                     reverse))
        ;TODO apply point-free style
        (core/remove (fn [[path* m]]
@@ -1133,21 +1108,12 @@
                                     (repeat 2)
                                     (get m path*)))))))
 
-(def initial-buffer
-  {:history initial-history
-   :x       initial-cursor
-   :y       initial-cursor})
-
-(def sink-buffer
+(def sink-loaded-history
   (->> (frp/snapshot current-file-path-event
                      current-file-path-behavior
-                     history-behavior
-                     cursor-x-behavior
-                     cursor-y-behavior)
-       (m/<$> (aid/build hash-map
-                         second
-                         (comp zipmap-history-x-y
-                               (partial drop 2))))
+                     ongoing-history-behavior)
+       (m/<$> (comp (partial apply hash-map)
+                    rest))
        core/merge
        (frp/stepper {})
        (frp/snapshot current-file-path-event)
@@ -1156,18 +1122,12 @@
                   fs/fexists? (->> k
                                    slurp
                                    edn/read-string
-                                   (move* :history
-                                          :content
-                                          (comp get-history
-                                                (partial s/transform*
-                                                         :edge
-                                                         (partial apply
-                                                                  loom/digraph))
-                                                (partial s/transform*
-                                                         :node
-                                                         augment)))
+                                   (s/transform :node augment)
+                                   (s/transform :edge
+                                                (partial apply loom/digraph))
+                                   get-history
                                    (get m k))
-                  initial-buffer)))))
+                  initial-history)))))
 
 (def initial-scroll
   0)
@@ -1221,7 +1181,7 @@
   (get-editing-bound :bottom))
 
 (def opening
-  (->> (aid/<$ true source-buffer)
+  (->> (aid/<$ true source-loaded-history)
        (m/<> (aid/<$ false (m/<> action valid-expression)))
        (frp/stepper true)))
 
@@ -1792,13 +1752,13 @@
   (partial run! (partial apply frp/run)))
 
 (loop-event {source-append-move           sink-append-move
-             source-buffer                sink-buffer
              source-directory             sink-directory
              source-dimension-register    sink-dimension-register
              source-dollar-move           sink-dollar-move
              source-edge-register         sink-edge-register
              source-in                    sink-in
              source-line-segment          sink-line-segment
+             source-loaded-history        sink-loaded-history
              source-nearest-move          sink-nearest-move
              source-node-register         sink-node-register
              source-position              sink-position
