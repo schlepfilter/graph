@@ -1101,11 +1101,10 @@
       (path.join helpers/app-name "position.edn")))
 
 (def previous-path-position
-  (m/<$> (comp (aid/build array-map
-                          first
-                          (comp (partial zipmap [:x :y])
-                                rest))
-               rest)
+  (m/<$> (aid/build hash-map
+                    second
+                    (comp (partial zipmap [:x :y])
+                          (partial drop 2)))
          (frp/snapshot (m/<> current-file-path-event
                              close)
                        current-file-path-behavior
