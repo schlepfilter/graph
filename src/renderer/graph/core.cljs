@@ -54,7 +54,6 @@
           source-scroll-x
           source-scroll-y
           source-transform-edge-action
-          source-undo-redo
           source-undo-redo-x
           source-undo-redo-y
           append
@@ -629,18 +628,6 @@
 (def content
   (m/<$> ffirst ongoing-history-event))
 
-(def get-undo-redo-cursor
-  #(m/<$> last (frp/snapshot source-undo-redo
-                             (->> content
-                                  (m/<$> %)
-                                  (frp/stepper initial-cursor)))))
-
-(def sink-undo-redo-x
-  (get-undo-redo-cursor :x))
-
-(def sink-undo-redo-y
-  (get-undo-redo-cursor :y))
-
 (def ongoing-history-behavior
   (frp/stepper initial-history ongoing-history-event))
 
@@ -651,9 +638,21 @@
                (frp/snapshot e
                              ongoing-history-behavior)))
 
-(def sink-undo-redo
+(def undo-redo
   (m/<> (get-valid valid-undo? undo)
         (get-valid valid-redo? redo)))
+
+(def get-undo-redo-cursor
+  #(m/<$> last (frp/snapshot undo-redo
+                             (->> content
+                                  (m/<$> %)
+                                  (frp/stepper initial-cursor)))))
+
+(def sink-undo-redo-x
+  (get-undo-redo-cursor :x))
+
+(def sink-undo-redo-y
+  (get-undo-redo-cursor :y))
 
 (def edge-event
   (m/<$> :edge content))
@@ -1765,7 +1764,6 @@
              source-scroll-x              sink-scroll-x
              source-scroll-y              sink-scroll-y
              source-transform-edge-action sink-transform-edge-action
-             source-undo-redo             sink-undo-redo
              source-undo-redo-x           sink-undo-redo-x
              source-undo-redo-y           sink-undo-redo-y})
 
