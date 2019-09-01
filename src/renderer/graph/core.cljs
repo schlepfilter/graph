@@ -1103,8 +1103,7 @@
 (def previous-path-position
   (m/<$> (aid/build hash-map
                     second
-                    (comp (partial zipmap [:x :y])
-                          (partial drop 2)))
+                    (partial drop 2))
          (frp/snapshot (m/<> current-file-path-event
                              close)
                        current-file-path-behavior
@@ -1122,6 +1121,11 @@
   (->> previous-path-position
        (m/<> (frp/event initial-path-position))
        core/merge))
+
+(def sink-position
+  (m/<$> (partial apply (fn [path* m]
+                          (get m path* (repeat 2 initial-cursor))))
+         (frp/snapshot current-file-path-event path-position)))
 
 (def initial-buffer
   {:history initial-history
