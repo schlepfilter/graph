@@ -64,3 +64,14 @@
 (def string
   (comp (partial apply (aid/lift-a str))
         (partial map =)))
+
+(def make-of
+  #(comp primitive/satisfy
+         %
+         set))
+
+(def one-of
+  (make-of identity))
+
+(def none-of
+  (make-of complement))
