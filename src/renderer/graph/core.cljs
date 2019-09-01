@@ -130,7 +130,9 @@
        ((aid/lift-a cons) start)))
 
 (def parse-command
-  (comp first
+  (comp (aid/if-then-else empty?
+                          identity
+                          first)
         (partial parse/parse command-parser)))
 
 (def default-path
