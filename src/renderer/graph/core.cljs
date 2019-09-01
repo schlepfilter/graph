@@ -40,6 +40,7 @@
           source-dollar-move
           source-nearest-move
           source-node-register
+          source-position
           source-scroll-x
           source-scroll-y
           source-transform-edge-action
@@ -206,8 +207,8 @@
   (partial frp/stepper initial-cursor))
 
 (def cursor-x-event
-  (->> source-buffer
-       (m/<$> :x)
+  (->> source-position
+       (m/<$> first)
        (m/<> (aid/<$ initial-cursor carrot)
              source-undo-redo-x
              source-dollar-move
@@ -216,8 +217,8 @@
        (get-cursor-event right left)))
 
 (def cursor-y-event
-  (->> source-buffer
-       (m/<$> :y)
+  (->> source-position
+       (m/<$> last)
        (m/<> source-undo-redo-y (m/<$> last source-nearest-move))
        (get-cursor-event down up)))
 
@@ -1123,9 +1124,11 @@
        core/merge))
 
 (def sink-position
-  (m/<$> (partial apply (fn [path* m]
-                          (get m path* (repeat 2 initial-cursor))))
-         (frp/snapshot current-file-path-event path-position)))
+  (->> path-position
+       (frp/stepper initial-path-position)
+       (frp/snapshot current-file-path-event)
+       (m/<$> (partial apply (fn [path* m]
+                               (get m path* (repeat 2 initial-cursor)))))))
 
 (def initial-buffer
   {:history initial-history
@@ -1795,6 +1798,7 @@
              source-line-segment          sink-line-segment
              source-nearest-move          sink-nearest-move
              source-node-register         sink-node-register
+             source-position              sink-position
              source-scroll-x              sink-scroll-x
              source-scroll-y              sink-scroll-y
              source-transform-edge-action sink-transform-edge-action
