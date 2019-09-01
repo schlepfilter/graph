@@ -103,8 +103,7 @@
     []))
 
 (def token
-  (->> (m/<> (parse/not= \ )
-             (parse/string "\\ "))
+  (->> (m/<> (parse/not= \ ) (parse/string "\\ "))
        parse/some
        (m/<$> (partial apply str))))
 
