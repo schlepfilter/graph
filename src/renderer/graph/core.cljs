@@ -1070,41 +1070,59 @@
                                    edn/read-string
                                    (= m))))))))
 
-(def position-path
-  (-> "cache"
-      electron.remote.app.getPath
-      (path.join helpers/app-name "position.edn")))
+(def info-path
+  (path.join home (str "." helpers/app-name "info")))
 
 (def previous-path-position
-  (m/<$> (aid/build hash-map
-                    second
-                    (partial drop 2))
-         (frp/snapshot (m/<> current-file-path-event
-                             close)
-                       current-file-path-behavior
-                       cursor-x-behavior
-                       cursor-y-behavior)))
+  (->> (frp/snapshot (m/<> current-file-path-event
+                           close)
+                     current-file-path-behavior
+                     cursor-x-behavior
+                     cursor-y-behavior)
+       (m/<$> rest)
+       (core/remove (comp empty?
+                          first))))
 
-(def initial-path-position
-  (aid/casep position-path
-    fs/fexists? (-> position-path
+(def initial-info
+  (aid/casep info-path
+    fs/fexists? (-> info-path
                     slurp
                     edn/read-string)
-    {}))
+    {:jumplist []}))
 
-(def path-position
+(def initial-jumplist
+  (:jumplist initial-info))
+
+(def maximum-jumplist-count
+  100)
+
+(def jumplist
   (->> previous-path-position
-       (m/<> (frp/event initial-path-position))
-       core/merge))
+       core/vector
+       (m/<$> (comp (partial take maximum-jumplist-count)
+                    reverse))))
+
+(def info
+  ;TODO implement command history
+  (m/<$> (partial hash-map :jumplist) jumplist))
+
+(defn get-first
+  [pred coll not-found]
+  (aid/if-then-else empty?
+                    (constantly not-found)
+                    first
+                    (filter pred coll)))
 
 (def sink-position
-  (->> path-position
-       (frp/stepper initial-path-position)
+  (->> jumplist
+       (frp/stepper initial-jumplist)
        (frp/snapshot current-file-path-event)
-       (m/<$> (partial apply (fn [path* m]
-                               (->> initial-cursor
-                                    (repeat 2)
-                                    (get m path*)))))))
+       (m/<$> (partial apply (fn [path* coll]
+                               (->> ["" initial-cursor initial-cursor]
+                                    (get-first (comp (partial = path*)
+                                                     first)
+                                               coll)
+                                    rest))))))
 
 (def sink-loaded-history
   (->> (frp/snapshot current-file-path-event
@@ -1840,7 +1858,7 @@
 (def spit+
   (make-+ spit))
 
-(frp/run (partial spit+ position-path) path-position)
+(frp/run (partial spit+ info-path) info)
 
 (frp/run (fn [_]
            (electron.remote.app.exit))
