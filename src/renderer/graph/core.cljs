@@ -42,7 +42,7 @@
 
 (frp/defe source-append-move
           source-dimension-register
-          source-directory
+          source-directory-path
           source-edge-register
           source-in
           source-line-segment
@@ -132,13 +132,13 @@
                           first)
         (partial parse/parse command-parser)))
 
-(def default-path
+(def default-directory-path
   (path.join home "Documents"))
 
 (def get-potential-path
   #(->>
-     source-directory
-     (frp/stepper default-path)
+     source-directory-path
+     (frp/stepper default-directory-path)
      (frp/snapshot
        (->> submission
             (m/<$> parse-command)
@@ -179,7 +179,7 @@
                                      valid-file?))
                potential-file-path))
 
-(def sink-directory
+(def sink-directory-path
   (->> "cd"
        get-potential-path
        (core/filter fs/fexists?)
@@ -1782,7 +1782,7 @@
   (partial run! (partial apply frp/run)))
 
 (loop-event {source-append-move           sink-append-move
-             source-directory             sink-directory
+             source-directory-path        sink-directory-path
              source-dimension-register    sink-dimension-register
              source-dollar-move           sink-dollar-move
              source-edge-register         sink-edge-register
