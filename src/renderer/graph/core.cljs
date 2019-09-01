@@ -1069,8 +1069,22 @@
                                    edn/read-string
                                    (= m))))))))
 
+(def info-name
+  (str helpers/app-name "info"))
+
+(def option-parser
+  ((aid/lift-a (comp last
+                     vector))
+    (parse/string info-name)
+    ;TODO implement "="
+    (parse/string "+=")
+    (parse/= \n)
+    token))
+
 (def info-path
-  (path.join home (str "." helpers/app-name "info")))
+  (->> info-name
+       (str ".")
+       (path.join home)))
 
 (def previous-path-position
   (->> (frp/snapshot (m/<> current-file-path-event
