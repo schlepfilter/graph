@@ -1097,7 +1097,7 @@
 
 (def position-path
   (-> "cache"
-      (electron.remote.app.getPath)
+      electron.remote.app.getPath
       (path.join helpers/app-name "position.edn")))
 
 (def previous-path-position
