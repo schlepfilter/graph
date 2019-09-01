@@ -30,6 +30,15 @@
             [graph.parse.core :as parse])
   (:require-macros [graph.core :refer [defc]]))
 
+(def os
+  (js/require "os"))
+
+(def path
+  (js/require "path"))
+
+(def electron
+  (js/require "electron"))
+
 (frp/defe source-append-move
           source-buffer
           source-dimension-register
@@ -77,15 +86,6 @@
           undo
           redo
           close)
-
-(def os
-  (js/require "os"))
-
-(def path
-  (js/require "path"))
-
-(def electron
-  (js/require "electron"))
 
 (def home
   (.homedir os))
