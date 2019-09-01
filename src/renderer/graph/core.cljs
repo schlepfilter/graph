@@ -591,9 +591,7 @@
 
 (def initial-history
   (get-history {:node initial-node
-                :edge initial-edge
-                :x    initial-cursor
-                :y    initial-cursor}))
+                :edge initial-edge}))
 
 (def reset
   (m/<$> constantly source-loaded-history))
@@ -1054,7 +1052,8 @@
                      current-file-path-behavior)
        (m/<$> (comp (partial s/transform*
                              s/LAST
-                             (comp (partial s/transform*
+                             (comp #(dissoc % :x :y)
+                                   (partial s/transform*
                                             :edge
                                             graph/edges)
                                    (partial s/transform*
