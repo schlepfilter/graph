@@ -1843,7 +1843,7 @@
    "u"      undo
    "w"      word
    "x"      delete
-   ;TODO: when mousetrap starts to support all keys capture, replace "y" with all keys capture
+   ;TODO replace "y" with all keys capture when mousetrap supports all keys capture
    ;https://github.com/ccampbell/mousetrap/issues/134
    "y"      yank})
 
