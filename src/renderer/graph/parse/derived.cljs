@@ -60,3 +60,7 @@
 (def not=
   (comp primitive/satisfy
         (aid/curry 2 core/not=)))
+
+(def string
+  (comp (partial apply (aid/lift-a str))
+        (partial map =)))

@@ -29,3 +29,6 @@
 
 (def not=
   derived/not=)
+
+(def string
+  derived/string)

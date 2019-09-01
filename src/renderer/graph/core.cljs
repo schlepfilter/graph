@@ -104,9 +104,7 @@
 
 (def token
   (->> (m/<> (parse/not= \ )
-             ((aid/lift-a vector)
-               (parse/= \\)
-               (parse/= \ )))
+             (parse/string "\\ "))
        parse/some
        (m/<$> (partial apply str))))
 
