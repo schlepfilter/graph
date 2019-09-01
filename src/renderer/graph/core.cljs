@@ -10,6 +10,7 @@
             [clojure.data.avl :as avl]
             [clojure.math.combinatorics :as combo]
             [cljs-node-io.core :refer [slurp spit]]
+            [cljs-node-io.file :as file]
             [cljs-node-io.fs :as fs]
             cljsjs.mousetrap
             [com.rpl.specter :as s]
@@ -1867,6 +1868,22 @@
                        vector))
 
 (frp/run (partial apply spit) modification)
+
+;TODO delete this function when cljs-node-io.fs supports mkdirs
+(def mkdirs
+  #(.mkdirs (file/File. %)))
+
+(def make-+
+  #(comp (juxt (comp mkdirs
+                     fs/dirname
+                     first)
+               (partial apply %))
+         vector))
+
+(def spit+
+  (make-+ spit))
+
+(frp/run (partial spit+ position-path) path-position)
 
 (frp/run (fn [_]
            (electron.remote.app.exit))
