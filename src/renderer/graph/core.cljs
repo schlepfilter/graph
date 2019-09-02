@@ -1136,7 +1136,9 @@
   ;TODO implement jump
   (->> previous-path-position
        (m/<$> vector)
-       (m/<> (m/<$> :jumplist config-info))
+       (m/<> (m/<$> (comp reverse
+                          :jumplist)
+                    config-info))
        core/concat
        (m/<$> (comp (partial take maximum-jumplist-size)
                     reverse))))
