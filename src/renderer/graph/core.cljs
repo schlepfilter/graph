@@ -1145,6 +1145,12 @@
   ;TODO implement command history
   (m/<$> (partial hash-map :jumplist) jumplist))
 
+(def info-path-info
+  (->> info-path
+       (frp/stepper default-info-path)
+       (frp/snapshot info)
+       (m/<$> reverse)))
+
 (defn get-first
   [pred coll not-found]
   (aid/if-then-else empty?
@@ -1897,7 +1903,7 @@
 (def spit+
   (make-+ spit))
 
-(frp/run (partial spit+ default-info-path) info)
+(frp/run (partial apply spit+) info-path-info)
 
 (frp/run (fn [_]
            (electron.remote.app.exit))
