@@ -272,7 +272,7 @@
        (m/<> command-exit escape)))
 
 (def undo-size
-  10)
+  100)
 
 (def align
   (partial (aid/flip str/join) ["\\begin{aligned}" "\\end{aligned}"]))
@@ -1129,7 +1129,7 @@
        (core/remove (comp empty?
                           first))))
 
-(def maximum-jumplist-count
+(def maximum-jumplist-size
   100)
 
 (def jumplist
@@ -1138,7 +1138,7 @@
        (m/<$> vector)
        (m/<> (m/<$> :jumplist config-info))
        core/concat
-       (m/<$> (comp (partial take maximum-jumplist-count)
+       (m/<$> (comp (partial take maximum-jumplist-size)
                     reverse))))
 
 (def info
