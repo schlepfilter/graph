@@ -1133,9 +1133,9 @@
 (def jumplist
   ;TODO implement jump
   (->> previous-path-position
+       (m/<$> vector)
        (m/<> (m/<$> :jumplist config-info))
-       core/vector
-       (core/drop 1)
+       core/concat
        (m/<$> (comp (partial take maximum-jumplist-count)
                     reverse))))
 
