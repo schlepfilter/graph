@@ -1107,6 +1107,16 @@
        (frp/snapshot completion)
        (m/<$> last)))
 
+(def initial-jumplist
+  [])
+
+(def config-info
+  (m/<$> (aid/if-then-else fs/fexists?
+                           (comp edn/read-string
+                                 slurp)
+                           (constantly {:jumplist initial-jumplist}))
+         config-info-path))
+
 (def previous-path-position
   (->> (frp/snapshot (m/<> current-file-path-event
                            close)
@@ -1117,23 +1127,15 @@
        (core/remove (comp empty?
                           first))))
 
-(def initial-info
-  (aid/casep default-info-path
-    fs/fexists? (-> default-info-path
-                    slurp
-                    edn/read-string)
-    {:jumplist []}))
-
-(def initial-jumplist
-  (:jumplist initial-info))
-
 (def maximum-jumplist-count
   100)
 
 (def jumplist
   ;TODO implement jump
   (->> previous-path-position
+       (m/<> (m/<$> :jumplist config-info))
        core/vector
+       (core/drop 1)
        (m/<$> (comp (partial take maximum-jumplist-count)
                     reverse))))
 
