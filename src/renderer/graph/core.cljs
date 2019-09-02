@@ -633,10 +633,10 @@
 
 (defn get-valid
   [f e]
-  (core/filter (comp f
-                     last)
-               (frp/snapshot e
-                             ongoing-history-behavior)))
+  (->> ongoing-history-behavior
+       (frp/snapshot e)
+       (core/filter (comp f
+                          last))))
 
 (def undo-redo
   (m/<> (get-valid valid-undo? undo)
