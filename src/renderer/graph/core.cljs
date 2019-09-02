@@ -1103,8 +1103,10 @@
        (path.join home)))
 
 (def config-info-path
-  (->> (frp/stepper default-info-path info-path)
+  (->> info-path
+       (frp/stepper default-info-path)
        (frp/snapshot completion)
+       (core/take 1)
        (m/<$> last)))
 
 (def initial-jumplist
