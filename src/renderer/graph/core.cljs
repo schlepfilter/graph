@@ -54,8 +54,7 @@
           source-scroll-x
           source-scroll-y
           source-transform-edge-action
-          source-undo-redo-x
-          source-undo-redo-y
+          source-undo-redo
           append
           blockwise-visual-toggle
           down
@@ -212,7 +211,7 @@
   (->> source-position
        (m/<$> first)
        (m/<> (aid/<$ initial-cursor carrot)
-             source-undo-redo-x
+             (m/<$> :x source-undo-redo)
              source-dollar-move
              (m/<$> first source-nearest-move)
              source-append-move)
@@ -221,7 +220,8 @@
 (def cursor-y-event
   (->> source-position
        (m/<$> last)
-       (m/<> source-undo-redo-y (m/<$> last source-nearest-move))
+       (m/<> (m/<$> :y source-undo-redo)
+             (m/<$> last source-nearest-move))
        (get-cursor-event down up)))
 
 (def cursor-x-behavior
@@ -632,27 +632,16 @@
   (frp/stepper initial-history ongoing-history-event))
 
 (defn get-valid
-  [f e]
+  [f g e]
   (->> ongoing-history-behavior
        (frp/snapshot e)
-       (core/filter (comp f
-                          last))))
+       (m/<$> last)
+       (core/filter f)
+       (m/<$> g)))
 
-(def undo-redo
-  (m/<> (get-valid valid-undo? undo)
-        (get-valid valid-redo? redo)))
-
-(def get-undo-redo-cursor
-  #(m/<$> last (frp/snapshot undo-redo
-                             (->> content
-                                  (m/<$> %)
-                                  (frp/stepper initial-cursor)))))
-
-(def sink-undo-redo-x
-  (get-undo-redo-cursor :x))
-
-(def sink-undo-redo-y
-  (get-undo-redo-cursor :y))
+(def sink-undo-redo
+  (m/<> (get-valid valid-undo? ffirst undo)
+        (get-valid valid-redo? lfirst redo)))
 
 (def edge-event
   (m/<$> :edge content))
@@ -1828,8 +1817,7 @@
              source-scroll-x              sink-scroll-x
              source-scroll-y              sink-scroll-y
              source-transform-edge-action sink-transform-edge-action
-             source-undo-redo-x           sink-undo-redo-x
-             source-undo-redo-y           sink-undo-redo-y})
+             source-undo-redo             sink-undo-redo})
 
 (frp/run #(oset! js/document "title" %) current-file-path-event)
 
