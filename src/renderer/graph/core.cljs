@@ -83,6 +83,7 @@
           bounds
           implication
           submission
+          completion
           undo
           redo
           close)
@@ -135,10 +136,12 @@
 (def default-directory-path
   (path.join home "Documents"))
 
+(def directory-path-behavior
+  (frp/stepper default-directory-path source-directory-path))
+
 (def get-potential-path
   #(->>
-     source-directory-path
-     (frp/stepper default-directory-path)
+     directory-path-behavior
      (frp/snapshot
        (->> submission
             (m/<$> parse-command)
@@ -1082,9 +1085,27 @@
     token))
 
 (def info-path
+  (->> directory-path-behavior
+       (frp/snapshot (->> submission
+                          (m/<$> parse-command)
+                          (core/filter (comp (partial = ":set")
+                                             first))
+                          (m/<$> (comp (partial parse/parse option-parser)
+                                       last))
+                          (core/remove empty?)
+                          (m/<$> first)))
+       (m/<$> (comp (partial apply path.join)
+                    reverse))))
+
+(def default-info-path
   (->> info-name
        (str ".")
        (path.join home)))
+
+(def config-info-path
+  (->> (frp/stepper default-info-path info-path)
+       (frp/snapshot completion)
+       (m/<$> last)))
 
 (def previous-path-position
   (->> (frp/snapshot (m/<> current-file-path-event
@@ -1097,8 +1118,8 @@
                           first))))
 
 (def initial-info
-  (aid/casep info-path
-    fs/fexists? (-> info-path
+  (aid/casep default-info-path
+    fs/fexists? (-> default-info-path
                     slurp
                     edn/read-string)
     {:jumplist []}))
@@ -1872,7 +1893,7 @@
 (def spit+
   (make-+ spit))
 
-(frp/run (partial spit+ info-path) info)
+(frp/run (partial spit+ default-info-path) info)
 
 (frp/run (fn [_]
            (electron.remote.app.exit))
@@ -1881,3 +1902,5 @@
 (frp/activate)
 
 (run! submission config-commands)
+
+(completion)
