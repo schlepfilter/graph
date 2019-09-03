@@ -945,17 +945,37 @@
                             get-left-top-line-segment)
                       get-left-top-line-segment)))
 
+(aid/defcurried effect
+  [f x]
+  (f x)
+  x)
+
+(defn memoize-one
+  [f!]
+  ;TODO use core.memoize when core.memoize supports ClojureScript
+  (let [state (atom {})]
+    (fn [& more]
+      (aid/case-eval more
+        (:arguments @state) (:return @state)
+        (->> more
+             (apply f!)
+             (effect #(reset! state {:arguments more
+                                     :return    %})))))))
+
 (def correspondence
-  ((aid/lift-a (fn [m edge]
-                 (->> edge
-                      graph/edges
-                      (map (aid/if-then-else (partial every? m)
-                                             (aid/build hash-map
-                                                        identity
-                                                        (comp get-line-segment
-                                                              (partial map m)))
-                                             (constantly {})))
-                      (apply merge {}))))
+  ((aid/lift-a
+     ;not calling memoize-one is visibly slower
+     (memoize-one
+       (fn [m edge]
+         (->> edge
+              graph/edges
+              (map (aid/if-then-else (partial every? m)
+                                     (aid/build hash-map
+                                                identity
+                                                (comp get-line-segment
+                                                      (partial map m)))
+                                     (constantly {})))
+              (apply merge {})))))
     (m/<$> (partial s/transform*
                     s/MAP-VALS
                     (comp (partial s/transform*
@@ -1279,23 +1299,6 @@
 
 (def maximum-y
   (get-maximum client-height sink-scroll-y editing-y-bound cursor-y-behavior))
-
-(aid/defcurried effect
-  [f x]
-  (f x)
-  x)
-
-(defn memoize-one
-  [f!]
-  ;TODO use core.memoize when core.memoize supports ClojureScript
-  (let [state (atom {})]
-    (fn [& more]
-      (aid/case-eval more
-        (:arguments @state) (:return @state)
-        (->> more
-             (apply f!)
-             (effect #(reset! state {:arguments more
-                                     :return    %})))))))
 
 (def get-status-text
   #(.keyBinding.getStatusText (:editor %) (:editor %)))
