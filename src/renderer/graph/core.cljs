@@ -946,8 +946,9 @@
                       get-left-top-line-segment)))
 
 (def correspondence
-  ((aid/lift-a (fn [m coll]
-                 (->> coll
+  ((aid/lift-a (fn [m edge]
+                 (->> edge
+                      graph/edges
                       (map (aid/if-then-else (partial every? m)
                                              (aid/build hash-map
                                                         identity
@@ -966,7 +967,7 @@
                                                  :height)
                                    shrink)))
            valid-bound-behavior)
-    (m/<$> graph/edges edge-behavior)))
+    edge-behavior))
 
 (def sink-line-segment
   (m/<$> (partial s/transform* s/MAP-VALS line/line2) correspondence))
