@@ -966,9 +966,7 @@
                                                  :height)
                                    shrink)))
            valid-bound-behavior)
-    (->> edge-event
-         (m/<$> graph/edges)
-         (frp/stepper []))))
+    (m/<$> graph/edges edge-behavior)))
 
 (def sink-line-segment
   (m/<$> (partial s/transform* s/MAP-VALS line/line2) correspondence))
