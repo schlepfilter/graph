@@ -29,3 +29,12 @@
 
 (def not=
   derived/not=)
+
+(def string
+  derived/string)
+
+(def one-of
+  derived/one-of)
+
+(def none-of
+  derived/none-of)

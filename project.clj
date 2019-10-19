@@ -5,7 +5,7 @@
                  [org.clojure/math.combinatorics "0.1.6"]
                  [cljs-node-io "1.1.2"]
                  [cljsjs/mousetrap "1.6.2-0"]
-                 [frp "0.1.3"]
+                 [frp "0.1.4"]
                  [me.raynes/fs "1.4.6"]
                  [reagent "0.8.1" :exclusions [cljsjs/react]]
                  [thi.ng/geom "1.0.0-RC3"]]

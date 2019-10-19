@@ -10,6 +10,7 @@
             [clojure.data.avl :as avl]
             [clojure.math.combinatorics :as combo]
             [cljs-node-io.core :refer [slurp spit]]
+            [cljs-node-io.file :as file]
             [cljs-node-io.fs :as fs]
             cljsjs.mousetrap
             [com.rpl.specter :as s]
@@ -30,22 +31,30 @@
             [graph.parse.core :as parse])
   (:require-macros [graph.core :refer [defc]]))
 
+(def os
+  (js/require "os"))
+
+(def path
+  (js/require "path"))
+
+(def electron
+  (js/require "electron"))
+
 (frp/defe source-append-move
-          source-buffer
           source-dimension-register
-          source-directory
+          source-directory-path
           source-edge-register
           source-in
           source-line-segment
+          source-loaded-history
           source-dollar-move
           source-nearest-move
           source-node-register
+          source-position
           source-scroll-x
           source-scroll-y
           source-transform-edge-action
           source-undo-redo
-          source-undo-redo-x
-          source-undo-redo-y
           append
           blockwise-visual-toggle
           down
@@ -73,18 +82,10 @@
           bounds
           implication
           submission
+          completion
           undo
           redo
           close)
-
-(def os
-  (js/require "os"))
-
-(def path
-  (js/require "path"))
-
-(def electron
-  (js/require "electron"))
 
 (def home
   (.homedir os))
@@ -102,10 +103,7 @@
     []))
 
 (def token
-  (->> (m/<> (parse/not= \ )
-             ((aid/lift-a vector)
-               (parse/= \\)
-               (parse/= \ )))
+  (->> (m/<> (parse/none-of " \\") (parse/string "\\ "))
        parse/some
        (m/<$> (partial apply str))))
 
@@ -129,16 +127,20 @@
        ((aid/lift-a cons) start)))
 
 (def parse-command
-  (comp first
+  (comp (aid/if-then-else empty?
+                          identity
+                          first)
         (partial parse/parse command-parser)))
 
-(def default-path
+(def default-directory-path
   (path.join home "Documents"))
+
+(def directory-path-behavior
+  (frp/stepper default-directory-path source-directory-path))
 
 (def get-potential-path
   #(->>
-     source-directory
-     (frp/stepper default-path)
+     directory-path-behavior
      (frp/snapshot
        (->> submission
             (m/<$> parse-command)
@@ -179,7 +181,7 @@
                                      valid-file?))
                potential-file-path))
 
-(def sink-directory
+(def sink-directory-path
   (->> "cd"
        get-potential-path
        (core/filter fs/fexists?)
@@ -206,19 +208,20 @@
   (partial frp/stepper initial-cursor))
 
 (def cursor-x-event
-  (->> source-buffer
-       (m/<$> :x)
+  (->> source-position
+       (m/<$> first)
        (m/<> (aid/<$ initial-cursor carrot)
-             source-undo-redo-x
+             (m/<$> :x source-undo-redo)
              source-dollar-move
              (m/<$> first source-nearest-move)
              source-append-move)
        (get-cursor-event right left)))
 
 (def cursor-y-event
-  (->> source-buffer
-       (m/<$> :y)
-       (m/<> source-undo-redo-y (m/<$> last source-nearest-move))
+  (->> source-position
+       (m/<$> last)
+       (m/<> (m/<$> :y source-undo-redo)
+             (m/<$> last source-nearest-move))
        (get-cursor-event down up)))
 
 (def cursor-x-behavior
@@ -269,7 +272,7 @@
        (m/<> command-exit escape)))
 
 (def undo-size
-  10)
+  100)
 
 (def align
   (partial (aid/flip str/join) ["\\begin{aligned}" "\\end{aligned}"]))
@@ -590,14 +593,10 @@
 
 (def initial-history
   (get-history {:node initial-node
-                :edge initial-edge
-                :x    initial-cursor
-                :y    initial-cursor}))
+                :edge initial-edge}))
 
 (def reset
-  (m/<$> (comp constantly
-               :history)
-         source-buffer))
+  (m/<$> constantly source-loaded-history))
 
 (def valid-undo?
   (comp multiton?
@@ -607,7 +606,7 @@
   (comp not-empty
         last))
 
-(def history-event
+(def ongoing-history-event
   (->> action
        (m/<> (aid/<$ (aid/if-then valid-undo?
                                   (comp (partial s/transform*
@@ -627,33 +626,22 @@
        (frp/accum initial-history)))
 
 (def content
-  (m/<$> ffirst history-event))
+  (m/<$> ffirst ongoing-history-event))
 
-(def get-undo-redo-cursor
-  #(m/<$> last (frp/snapshot source-undo-redo
-                             (->> content
-                                  (m/<$> %)
-                                  (frp/stepper initial-cursor)))))
-
-(def sink-undo-redo-x
-  (get-undo-redo-cursor :x))
-
-(def sink-undo-redo-y
-  (get-undo-redo-cursor :y))
-
-(def history-behavior
-  (frp/stepper initial-history history-event))
+(def ongoing-history-behavior
+  (frp/stepper initial-history ongoing-history-event))
 
 (defn get-valid
-  [f e]
-  (core/filter (comp f
-                     last)
-               (frp/snapshot e
-                             history-behavior)))
+  [f g e]
+  (->> ongoing-history-behavior
+       (frp/snapshot e)
+       (m/<$> last)
+       (core/filter f)
+       (m/<$> g)))
 
 (def sink-undo-redo
-  (m/<> (get-valid valid-undo? undo)
-        (get-valid valid-redo? redo)))
+  (m/<> (get-valid valid-undo? ffirst undo)
+        (get-valid valid-redo? lfirst redo)))
 
 (def edge-event
   (m/<$> :edge content))
@@ -957,16 +945,37 @@
                             get-left-top-line-segment)
                       get-left-top-line-segment)))
 
+(aid/defcurried effect
+  [f x]
+  (f x)
+  x)
+
+(defn memoize-one
+  [f!]
+  ;TODO use core.memoize when core.memoize supports ClojureScript
+  (let [state (atom {})]
+    (fn [& more]
+      (aid/case-eval more
+        (:arguments @state) (:return @state)
+        (->> more
+             (apply f!)
+             (effect #(reset! state {:arguments more
+                                     :return    %})))))))
+
 (def correspondence
-  ((aid/lift-a (fn [m coll]
-                 (->> coll
-                      (map (aid/if-then-else (partial every? m)
-                                             (aid/build hash-map
-                                                        identity
-                                                        (comp get-line-segment
-                                                              (partial map m)))
-                                             (constantly {})))
-                      (apply merge {}))))
+  ((aid/lift-a
+     ;not calling memoize-one is visibly slower
+     (memoize-one
+       (fn [m edge]
+         (->> edge
+              graph/edges
+              (map (aid/if-then-else (partial every? m)
+                                     (aid/build hash-map
+                                                identity
+                                                (comp get-line-segment
+                                                      (partial map m)))
+                                     (constantly {})))
+              (apply merge {})))))
     (m/<$> (partial s/transform*
                     s/MAP-VALS
                     (comp (partial s/transform*
@@ -978,9 +987,7 @@
                                                  :height)
                                    shrink)))
            valid-bound-behavior)
-    (->> edge-event
-         (m/<$> graph/edges)
-         (frp/stepper []))))
+    edge-behavior))
 
 (def sink-line-segment
   (m/<$> (partial s/transform* s/MAP-VALS line/line2) correspondence))
@@ -1010,7 +1017,7 @@
 
 (def edge-mode
   (->> source-in
-       (m/<> mode-event history-event)
+       (m/<> mode-event ongoing-history-event)
        (aid/<$ false)
        (m/<> (aid/<$ true edge-node-event))
        (frp/stepper false)))
@@ -1043,48 +1050,26 @@
 (def file-path-placeholder
   "")
 
-(aid/defcurried move*
-  [to from f m]
-  (->> m
-       (aid/transfer* to
-                      (comp f
-                            (partial s/select-one* from)))
-       (s/setval from s/NONE)))
-
 (def current-file-path-behavior
   (frp/stepper file-path-placeholder current-file-path-event))
 
-(def zipmap-history-x-y
-  (partial zipmap [:history :x :y]))
-
 (def modification
-  (->> (frp/snapshot
-         ;TODO don't save x and y in each file
-         (m/<> (m/<$> (aid/build (partial s/setval* :history)
-                                 identity
-                                 (comp (partial (aid/flip select-keys)
-                                                [:x :y])
-                                       ffirst))
-                      history-event)
-               (m/<$> (comp zipmap-history-x-y
-                            rest)
-                      (frp/snapshot (m/<> current-file-path-event
-                                          close)
-                                    history-behavior
-                                    cursor-x-behavior
-                                    cursor-y-behavior)))
-         current-file-path-behavior)
+  (->> (frp/snapshot (m/<> ongoing-history-event
+                           (m/<$> last
+                                  (frp/snapshot (m/<> current-file-path-event
+                                                      close)
+                                                ongoing-history-behavior)))
+                     current-file-path-behavior)
        (m/<$> (comp (partial s/transform*
                              s/LAST
-                             (move* :content
-                                    :history
-                                    (comp (partial s/transform*
-                                                   :edge
-                                                   graph/edges)
-                                          (partial s/transform*
-                                                   :node
-                                                   :canonical)
-                                          ffirst)))
+                             (comp #(dissoc % :x :y)
+                                   (partial s/transform*
+                                            :edge
+                                            graph/edges)
+                                   (partial s/transform*
+                                            :node
+                                            :canonical)
+                                   ffirst))
                     reverse))
        ;TODO apply point-free style
        (core/remove (fn [[path* m]]
@@ -1095,21 +1080,111 @@
                                    edn/read-string
                                    (= m))))))))
 
-(def initial-buffer
-  {:history initial-history
-   :x       initial-cursor
-   :y       initial-cursor})
+(def info-name
+  (str helpers/app-name "info"))
 
-(def sink-buffer
-  (->> (frp/snapshot current-file-path-event
+(def option-parser
+  ((aid/lift-a (comp last
+                     vector))
+    (parse/string info-name)
+    ;TODO implement "="
+    (parse/string "+=")
+    (parse/= \n)
+    token))
+
+(def info-path
+  (->> directory-path-behavior
+       (frp/snapshot (->> submission
+                          (m/<$> parse-command)
+                          (core/filter (comp (partial = ":set")
+                                             first))
+                          (m/<$> (comp (partial parse/parse option-parser)
+                                       last))
+                          (core/remove empty?)
+                          (m/<$> first)))
+       (m/<$> (comp (partial apply path.join)
+                    reverse))))
+
+(def default-info-path
+  (->> info-name
+       (str ".")
+       (path.join home)))
+
+(def config-info-path
+  (->> info-path
+       (frp/stepper default-info-path)
+       (frp/snapshot completion)
+       (core/take 1)
+       (m/<$> last)))
+
+(def initial-jumplist
+  [])
+
+(def config-info
+  (m/<$> (aid/if-then-else fs/fexists?
+                           (comp edn/read-string
+                                 slurp)
+                           (constantly {:jumplist initial-jumplist}))
+         config-info-path))
+
+(def previous-path-position
+  (->> (frp/snapshot (m/<> current-file-path-event
+                           close)
                      current-file-path-behavior
-                     history-behavior
                      cursor-x-behavior
                      cursor-y-behavior)
-       (m/<$> (aid/build hash-map
-                         second
-                         (comp zipmap-history-x-y
-                               (partial drop 2))))
+       (m/<$> rest)
+       (core/remove (comp empty?
+                          first))))
+
+(def maximum-jumplist-size
+  100)
+
+(def jumplist
+  ;TODO implement jump
+  (->> previous-path-position
+       (m/<$> vector)
+       (m/<> (m/<$> (comp reverse
+                          :jumplist)
+                    config-info))
+       core/concat
+       (m/<$> (comp (partial take maximum-jumplist-size)
+                    reverse))))
+
+(def info
+  ;TODO implement command history
+  (m/<$> (partial hash-map :jumplist) jumplist))
+
+(def info-path-info
+  (->> info-path
+       (frp/stepper default-info-path)
+       (frp/snapshot info)
+       (m/<$> reverse)))
+
+(defn get-first
+  [pred coll not-found]
+  (aid/if-then-else empty?
+                    (constantly not-found)
+                    first
+                    (filter pred coll)))
+
+(def sink-position
+  (->> jumplist
+       (frp/stepper initial-jumplist)
+       (frp/snapshot current-file-path-event)
+       (m/<$> (partial apply (fn [path* coll]
+                               (->> ["" initial-cursor initial-cursor]
+                                    (get-first (comp (partial = path*)
+                                                     first)
+                                               coll)
+                                    rest))))))
+
+(def sink-loaded-history
+  (->> (frp/snapshot current-file-path-event
+                     current-file-path-behavior
+                     ongoing-history-behavior)
+       (m/<$> (comp (partial apply hash-map)
+                    rest))
        core/merge
        (frp/stepper {})
        (frp/snapshot current-file-path-event)
@@ -1118,18 +1193,12 @@
                   fs/fexists? (->> k
                                    slurp
                                    edn/read-string
-                                   (move* :history
-                                          :content
-                                          (comp get-history
-                                                (partial s/transform*
-                                                         :edge
-                                                         (partial apply
-                                                                  loom/digraph))
-                                                (partial s/transform*
-                                                         :node
-                                                         augment)))
+                                   (s/transform :node augment)
+                                   (s/transform :edge
+                                                (partial apply loom/digraph))
+                                   get-history
                                    (get m k))
-                  initial-buffer)))))
+                  initial-history)))))
 
 (def initial-scroll
   0)
@@ -1183,7 +1252,7 @@
   (get-editing-bound :bottom))
 
 (def opening
-  (->> (aid/<$ true source-buffer)
+  (->> (aid/<$ true source-loaded-history)
        (m/<> (aid/<$ false (m/<> action valid-expression)))
        (frp/stepper true)))
 
@@ -1230,23 +1299,6 @@
 
 (def maximum-y
   (get-maximum client-height sink-scroll-y editing-y-bound cursor-y-behavior))
-
-(aid/defcurried effect
-  [f x]
-  (f x)
-  x)
-
-(defn memoize-one
-  [f!]
-  ;TODO use core.memoize when core.memoize supports ClojureScript
-  (let [state (atom {})]
-    (fn [& more]
-      (aid/case-eval more
-        (:arguments @state) (:return @state)
-        (->> more
-             (apply f!)
-             (effect #(reset! state {:arguments more
-                                     :return    %})))))))
 
 (def get-status-text
   #(.keyBinding.getStatusText (:editor %) (:editor %)))
@@ -1754,21 +1806,20 @@
   (partial run! (partial apply frp/run)))
 
 (loop-event {source-append-move           sink-append-move
-             source-buffer                sink-buffer
-             source-directory             sink-directory
+             source-directory-path        sink-directory-path
              source-dimension-register    sink-dimension-register
+             source-dollar-move           sink-dollar-move
              source-edge-register         sink-edge-register
-             source-undo-redo             sink-undo-redo
              source-in                    sink-in
              source-line-segment          sink-line-segment
-             source-dollar-move           sink-dollar-move
+             source-loaded-history        sink-loaded-history
              source-nearest-move          sink-nearest-move
              source-node-register         sink-node-register
+             source-position              sink-position
              source-scroll-x              sink-scroll-x
              source-scroll-y              sink-scroll-y
              source-transform-edge-action sink-transform-edge-action
-             source-undo-redo-x           sink-undo-redo-x
-             source-undo-redo-y           sink-undo-redo-y})
+             source-undo-redo             sink-undo-redo})
 
 (frp/run #(oset! js/document "title" %) current-file-path-event)
 
@@ -1805,7 +1856,7 @@
    "u"      undo
    "w"      word
    "x"      delete
-   ;TODO: when mousetrap starts to support all keys capture, replace "y" with all keys capture
+   ;TODO replace "y" with all keys capture when mousetrap supports all keys capture
    ;https://github.com/ccampbell/mousetrap/issues/134
    "y"      yank})
 
@@ -1830,6 +1881,22 @@
 
 (frp/run (partial apply spit) modification)
 
+;TODO delete this function when cljs-node-io.fs supports mkdirs
+(def mkdirs
+  #(.mkdirs (file/File. %)))
+
+(def make-+
+  #(comp (juxt (comp mkdirs
+                     fs/dirname
+                     first)
+               (partial apply %))
+         vector))
+
+(def spit+
+  (make-+ spit))
+
+(frp/run (partial apply spit+) info-path-info)
+
 (frp/run (fn [_]
            (electron.remote.app.exit))
          close)
@@ -1837,3 +1904,5 @@
 (frp/activate)
 
 (run! submission config-commands)
+
+(completion)
